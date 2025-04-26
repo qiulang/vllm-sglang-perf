@@ -1,27 +1,44 @@
-# SGLang vs vLLM Performance Comparison (sort of)
+# SGLang vs vLLM Performance Comparison: An Initial Assessment
+
+## Table of Contents
+- [Introduction](#introduction)
+- [Test Setup](#test-setup)
+- [Key Findings](#key-findings)
+- [Detailed Results](#detailed-results)
+- [SGLang Performance Analysis](#sglang-performance-analysis)
+- [Warm-up Effect](#warm-up-effect)
+- [Limitations and Suggestions](#limitations-and-suggestions)
+- [Testing Scripts](#testing-scripts)
+- [Running Your Own Tests](#running-your-own-tests)
+- [Important Notes on Performance Testing](#important-notes-on-performance-testing)
+- [Conclusion](#conclusion)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Introduction
 
+Before starting this comparison, I had no bias toward either framework and was simply curious about their relative performance. The results turned out to be quite **surprising**.
+
 Benchmark testing without clear objectives can often be misleading and produce non-objective results. However, this project has a specific, focused goal: to evaluate how vLLM and SGLang perform when running a small LLM model on a **mid-range** NVIDIA GPU like A10. 
 
-For this test, I selected the Qwen 2.5 7B quantized model. I specifically chose its AWQ variant rather than the GPTQ int 4-bit model, based on both information from sources like https://github.com/mit-han-lab/llm-awq and my own testing, which showed AWQ outperforming GPTQ int 4-bit models.
+SGLang and vLLM are both high-performance inference frameworks for large language models, with SGLang taking a compilation-based approach while vLLM focuses on optimized attention and memory management.
+
+For this test, I selected the Qwen 2.5 7B quantized model. I specifically chose its **AWQ** variant rather than the GPTQ int 4-bit model, based on both information from sources like https://github.com/mit-han-lab/llm-awq and my own testing, which showed AWQ outperforming GPTQ int 4-bit models.
 
 This represents a practical, real-world scenario for organizations deploying smaller quantized models on accessible hardware, rather than focusing on high-end multi-GPU setups that may be less common in production environments.
-
-**Before the test I have no idea what result I will get as I have no bias for either of them, but the result turns out to be quite surpring.**
-
 
 ## Test Setup
 
 ### Hardware
 - [NVIDIA A10 GPU (24GB)](https://www.nvidia.com/en-us/data-center/products/a10-gpu/)
-- Intel® Xeon® Gold 6326 Processor,  **30** GiB memory
+- Intel® Xeon® Gold 6326 Processor,  8 cores vCPU,  30 GiB memory
 
 ### Software
-- Ubuntu 22, conda 23.7.4, python 3.12
-- SGLang (version 0.4.5 latest)
-- vLLM (version v0.8.4 latest)
-- Model: [Qwen2.5 7B-AWQ (quantized) ](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-AWQ)
+- Ubuntu 22, GPU Driver 550.127.08/CUDA 12.4.1/CUDNN 9.2.0.82
+- Conda 23.7.4, python 3.12
+- SGLang (version 0.4.5 latest  `pip install "sglang[all]>=0.4.5.post3" ` )
+- vLLM (version v0.8.4 latest  `pip install vllm` )
+- Model: [Qwen2.5 7B-AWQ (quantized)](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-AWQ)
 
 ### Test Parameters
 - Requests: 20 (small test) and 300 (larger test)
@@ -30,21 +47,24 @@ This represents a practical, real-world scenario for organizations deploying sma
 
 ### Test workflow
 
-1. First SGLang testing:
-   - Start the SGLang server
-   - Run the SGLang stress test script (my gloriously unrefined code, lol)
+1. Setup:
+   - Started with a clean Ubuntu 22 machine with only CUDA & Conda environments installed
+   - No other GPU-intensive processes running during tests
+2. First SGLang testing:
+   - Start the SGLang server, `python3 -m sglang.launch_server --model-path $MODEL_PATH --max-total-tokens 8192`
+   - Run the SGLang stress test script, which is provided as-is and may benefit from further refinement
    - Record the performance metrics
-2. For vLLM testing:
+3. For vLLM testing:
    - Stop the SGLang server
-   - Start the vLLM server
-   - Run the vLLM stress test script (my gloriously unrefined code, lol)
+   - Start the vLLM server, `vllm serve $MODEL_PATH --max-model-len 8192`
+   - Run the vLLM stress test script(which is provided as-is and may benefit from further refinement)
    - Record the performance metrics
 
 ## Key Findings
 
 ### The most striking finding
 
-The most striking finding is from the GPU usage report when SGLang delivers higher throughput than vLLM, more consistent response times, similar or better token generation rates
+The most striking finding is from the GPU usage report. While SGLang delivers higher throughput than vLLM, more consistent response times, and similar or better token generation rates, it does so with dramatically less memory usage:
 
 | Metric                     | SGLang              | vLLM                 |
 | -------------------------- | ------------------- | -------------------- |
@@ -62,7 +82,13 @@ The patterns are remarkably consistent:
 
 What makes this particularly impressive is that SGLang is delivering about **57% higher** throughput while using **63% less memory**. The computational efficiency difference is substantial.
 
- `nvidai-smi` result sample for **SGLang** 
+This memory efficiency has significant practical implications:
+- Ability to serve larger models on the same hardware
+- Run multiple models simultaneously on a single GPU
+- Reduce cloud infrastructure costs where GPU memory is a primary cost driver
+- Support more concurrent users without hardware upgrades
+
+### `nvidia-smi` result sample for **SGLang** 
 
 ```
 +-----------------------------------------------------------------------------------------+
@@ -86,7 +112,7 @@ Fri Apr 25 22:21:23 2025
 +-----------------------------------------+------------------------+----------------------+
 ```
 
- `nvidai-smi` result sample for **vllm** 
+### `nvidia-smi` result sample for **vLLM** 
 
 ```
 +-----------------------------------------------------------------------------------------+
@@ -116,9 +142,11 @@ Fri Apr 25 22:19:31 2025
 - **Throughput**: At 30 concurrent requests, SGLang achieved ~57% higher throughput
 - **GPU Utilization**: Both frameworks utilized the GPU efficiently (91-95%)
 
-### Test result sample 
+## Detailed Results
 
-SGlang  for 5 Concurrent Requests (20 total)
+### Test result samples
+
+#### SGLang for 5 Concurrent Requests (20 total)
 
 ```
 Test completed in 6.05 seconds
@@ -148,10 +176,9 @@ Test completed in 6.05 seconds
 │ Avg Tokens Per Request     │ 100.70                          │
 │ Peak Requests In Flight    │ 5                               │
 └────────────────────────────┴─────────────────────────────────┘
-
 ```
 
-vLLM  for 5 Concurrent Requests (20 total)
+#### vLLM for 5 Concurrent Requests (20 total)
 
 ```
 Test completed in 7.56 seconds
@@ -185,8 +212,7 @@ Test completed in 7.56 seconds
 └────────────────────────────┴──────────────────────────────────────┘
 ```
 
-
-### Detailed Results
+### Summary Comparison Tables
 
 #### 5 Concurrent Requests (20 total)
 | Metric | SGLang | vLLM |
@@ -204,11 +230,9 @@ Test completed in 7.56 seconds
 | Throughput | 14.92 req/s | 9.50 req/s |
 | Token Generation | 1544.94 tok/s | 961.05 tok/s |
 
+## SGLang Performance Analysis
 
-
-### SGLang results summary
-
-The SGLang results shows several impressive performance characteristics:
+The SGLang results show several impressive performance characteristics:
 
 1. **Extremely consistent response times** - The standard deviation is only 0.01 seconds, and there's virtually no difference between min (1.51s) and max (1.52s) response times. This is remarkable consistency that's very rare in LLM inference.
 2. **High token generation speed** - 341.08 tokens per second overall is excellent for a 7B parameter model, especially if it's running on a single GPU.
@@ -230,9 +254,20 @@ For production deployments, SGLang's memory efficiency would allow you to:
 
 These characteristics make SGLang particularly attractive for high-throughput production environments where GPU memory is often the limiting factor.
 
-## "warm-up" effect
+## vLLM Performance Analysis
 
-Compared vllm, SGlang exhibits a "warm-up" effect where:
+While vLLM's performance was less impressive in this specific test configuration, it's worth noting some of its strengths:
+
+1. **Mature ecosystem** - vLLM has a more established ecosystem and wider adoption
+2. **OpenAI-compatible API** - Makes it easier to integrate with existing applications
+3. **Good scaling** - While not tested here, vLLM is known to scale well across multiple GPUs
+4. **Active development** - The project continues to receive regular performance improvements
+
+vLLM has been traditionally known for its efficient KV cache management, which can make it suitable for serving very large models with long context lengths. Its higher memory usage might be a trade-off for flexibility in handling variable batch sizes and context lengths.
+
+## Warm-up Effect
+
+Compared to vLLM, SGLang exhibits a "warm-up" effect:
 
 ### SGLang Performance: First Run vs. Warmed Up (5 concurrent requests)
 
@@ -258,12 +293,7 @@ For production deployments, this suggests:
 
 This makes SGLang particularly well-suited for persistent services rather than serverless or on-demand deployments where cold starts might be frequent.
 
-
-## Testing Scripts
-
-This repository includes the scripts used for testing:
-- `sglang_stress_test.py`: Script for testing SGLang
-- `vllm_stress_test.py`: Script for testing vLLM
+## Limitations and Suggestions
 
 ### Potential Limitations
 
@@ -283,11 +313,13 @@ This repository includes the scripts used for testing:
 5. **Measure cold start times**: If relevant for your use case
 6. **Test with real application patterns**: Use actual request patterns from your application
 
+## Testing Scripts
 
+This repository includes the scripts used for testing:
+- `sglang_stress_test.py`: Script for testing SGLang
+- `vllm_stress_test.py`: Script for testing vLLM
 
-**Basically,  please help me refine my test codes** 
-
-
+These scripts measure key performance metrics including response times, throughput, token generation rate, and more. They are provided as-is and contributions to improve them are welcome.
 
 ## Running Your Own Tests
 
@@ -306,7 +338,7 @@ python vllm_stress_test.py --url "http://localhost:8000/v1/completions" --model 
 
 Modify the parameters to match your setup and requirements.
 
-## ⚠️ Important Notes on Performance Testing
+## Important Notes on Performance Testing
 
 Performance testing can be insightful but is rarely definitive. Before reviewing these results, please consider these common limitations in benchmarking:
 
@@ -321,9 +353,15 @@ This testing aims to provide a reasonable comparison under specific conditions, 
 
 ## Conclusion
 
-SGLang demonstrated significant memory efficiency advantages while delivering higher throughput and more consistent response times for this specific model and test configuration. However, the optimal choice between frameworks depends on your specific use case, hardware, and requirements.
+SGLang demonstrated significant memory efficiency advantages while delivering higher throughput and more consistent response times for this specific model and test configuration. The 63% lower memory usage combined with 57% higher throughput makes it particularly suitable for environments where maximizing GPU utilization is critical.
 
-I (Qiulang), encourage users to run their own tests with workloads representative of their actual production needs.
+One of the most intriguing questions raised by this research is: **Why can SGLang operate with only one-third of the GPU memory compared to vLLM while delivering better performance?** This dramatic efficiency difference warrants further investigation by the community and could have significant implications for future LLM inference optimization.
+
+However, the optimal choice between frameworks depends on your specific use case, hardware, and requirements. vLLM remains a solid choice for many deployments, especially where its mature ecosystem and compatibility with OpenAI APIs are valuable.
+
+Future work could explore performance with larger models, multi-GPU setups, and more diverse workloads to provide a more comprehensive comparison.
+
+I encourage users to run their own tests with workloads representative of their actual production needs.
 
 ## Contributing
 
