@@ -32,7 +32,7 @@ This represents a practical, real-world scenario for organizations deploying sma
 ## Test Setup
 
 ### Hardware
-- Single and dual [NVIDIA A10 GPU (24GB)](https://www.nvidia.com/en-us/data-center/products/a10-gpu/) configurations
+- Single, dual and quad [NVIDIA A10 GPU (24GB)](https://www.nvidia.com/en-us/data-center/products/a10-gpu/) configurations
 - Intel® Xeon® Gold 6326 Processor, **30** GiB memory
 
 ### Software
@@ -54,13 +54,13 @@ This represents a practical, real-world scenario for organizations deploying sma
    - No other GPU processes running during tests as nvidia-smi shows zero usage.
 
 2. First SGLang testing:
-   - Start the SGLang server, `python3 -m sglang.launch_server --model-path $MODEL_PATH --context-length 8192 --dp 1 or 2`
+   - Start the SGLang server, `python3 -m sglang.launch_server --model-path $MODEL_PATH --context-length 8192 --dp 1|2|4`
    - Run the SGLang stress test script (which is provided as-is and may benefit from further refinement)
    - Record the performance metrics
 
 3. For vLLM testing:
    - Stop the SGLang server
-   - Start the vLLM server, `vllm serve $MODEL_PATH --max-model-len 8192 --tensor-parallel-size 1 or 2`
+   - Start the vLLM server, `vllm serve $MODEL_PATH --max-model-len 8192 --tensor-parallel-size 1|2|4`
    - Run the vLLM stress test script
    - Record the performance metrics
 
@@ -77,6 +77,8 @@ The most striking discovery from this testing is the dramatic reversal in perfor
 2. **In multi-GPU scenarios**: vLLM maintained consistent performance while SGLang showed significant variability and decreased throughput.
 
 3. **Unexpected scaling behavior for SGLang** : When testing SGLang on 2 A10 GPUs compared to a single A10 GPU, performance surprisingly **degraded rather than improved**. With 2 GPUs, SGLang showed significantly higher response time variance (std dev increasing from 0.01s to 1.94-2.37s) and less predictable throughput (for 5 & 30 concyrrent requests). This counter-intuitive finding suggests that SGLang may be optimized for single-GPU performance, and its current implementation might not efficiently distribute work across multiple GPUs.  Refer to the test result [here](./TwoA10-test-result-samples.md)
+
+4. To futher comfirm this unexpected scaling behavior for SGLang, I then tested SGLang on 4 A10 GPUs and got the same result.
 
 ## Single-GPU Results
 
@@ -184,7 +186,7 @@ Refer to the complete result [here](./OneA10-test-result-samples.md)
 
 ## Multi-GPU Results
 
-When testing with 2 A10 GPUs, the performance characteristics reversed dramatically:
+When testing with **2 A10** GPUs, the performance characteristics **reversed** dramatically:
 
 ### Multi-GPU Test Results
 
@@ -252,12 +254,12 @@ Test completed in 60.97 seconds
 └────────────────────────────┴─────────────────────────────────┘
 ```
 
-**For 2 A10 GPU, SGLang showed significantly higher response time variance and less predictable throughput.** At the first it is hard to believe this, so I test many times to confirmed that.
+**For 2 A10 GPU, SGLang showed significantly higher response time variance and less predictable throughput.** At the first it is hard to believe this, so I test many times to confirmed that. I then tested on **4 A10** GPU, SGLang still showed this strange behavious. Refer to the complete result [here](./4A10.md)
 
-For 2 A10 GPU, vLLM indeed showed a slightly better result for 1 A10 GPU.
+For 2 A10 GPU, vLLM indeed showed a slightly better result for 1 A10 GPU (same 4 A10).
 
 
-#### vLLM with 30 Concurrent Requests (300 total)
+#### vLLM with 30 Concurrent Requests (300 total) on 2 A10
 
 ```
            vLLM Stress Test Results - 2025-04-27 14:26:27            
@@ -290,7 +292,7 @@ For 2 A10 GPU, vLLM indeed showed a slightly better result for 1 A10 GPU.
 └────────────────────────────┴──────────────────────────────────────┘
 ```
 
-#### Another vLLM run showing similar consistency:
+#### Another vLLM run showing similar consistency on 2 A10
 
 ```
 Test completed in 29.73 seconds
