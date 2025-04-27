@@ -4,8 +4,10 @@
 - [Introduction](#introduction)
 - [Test Setup](#test-setup)
 - [Key Findings](#key-findings)
-- [Detailed Results](#detailed-results)
-- [SGLang Performance Analysis](#sglang-performance-analysis)
+- [Single-GPU Results](#single-gpu-results)
+- [Multi-GPU Results](#multi-gpu-results)
+- [Parameter Equivalence Discovery](#parameter-equivalence-discovery)
+- [Performance Analysis](#performance-analysis)
 - [Warm-up Effect](#warm-up-effect)
 - [Limitations and Suggestions](#limitations-and-suggestions)
 - [Testing Scripts](#testing-scripts)
@@ -17,27 +19,27 @@
 
 ## Introduction
 
-Before starting this comparison, I had no bias toward either framework and was simply curious about their relative performance. The results turned out to be quite **surprising**.
-
-Benchmark testing without clear objectives can often be misleading and produce non-objective results. However, this project has a specific, focused goal: to evaluate how vLLM and SGLang perform when running a small LLM model on a **mid-range** NVIDIA GPU like A10. 
-
 SGLang and vLLM are both high-performance inference frameworks for large language models, with SGLang taking a compilation-based approach while vLLM focuses on optimized attention and memory management.
 
-For this test, I selected the Qwen 2.5 7B quantized model. I specifically chose its **AWQ** variant rather than the GPTQ int 4-bit model, based on both information from sources like https://github.com/mit-han-lab/llm-awq and my own testing, which showed AWQ outperforming GPTQ int 4-bit models.
+Before starting this comparison, I had no bias toward either framework and was simply curious about their relative performance. The results turned out to be quite surprising and nuanced, with each framework showing distinct advantages in different deployment scenarios.
+
+Benchmark testing without clear objectives can often be misleading and produce non-objective results. However, this project has a specific, focused goal: to evaluate how vLLM and SGLang perform when running a small LLM model on a **mid-range** NVIDIA GPU like A10, in both single and multi-GPU configurations.
+
+For this test, I selected the Qwen 2.5 7B quantized model. I specifically chose its AWQ variant rather than the GPTQ int 4-bit model, based on both information from sources like https://github.com/mit-han-lab/llm-awq and my own testing, which showed AWQ outperforming GPTQ int 4-bit models.
 
 This represents a practical, real-world scenario for organizations deploying smaller quantized models on accessible hardware, rather than focusing on high-end multi-GPU setups that may be less common in production environments.
 
 ## Test Setup
 
 ### Hardware
-- [NVIDIA A10 GPU (24GB)](https://www.nvidia.com/en-us/data-center/products/a10-gpu/)
-- Intel® Xeon® Gold 6326 Processor,  8 cores vCPU,  30 GiB memory
+- Single and dual [NVIDIA A10 GPU (24GB)](https://www.nvidia.com/en-us/data-center/products/a10-gpu/) configurations
+- Intel® Xeon® Gold 6326 Processor, **30** GiB memory
 
 ### Software
 - Ubuntu 22, GPU Driver 550.127.08/CUDA 12.4.1/CUDNN 9.2.0.82
 - Conda 23.7.4, python 3.12
-- SGLang (version 0.4.5 latest  `pip install "sglang[all]>=0.4.5.post3" ` )
-- vLLM (version v0.8.4 latest  `pip install vllm` )
+- SGLang (version 0.4.5 latest, `pip install "sglang[all]>=0.4.5.post3"` )
+- vLLM (version v0.8.4 latest, `pip install vllm`)
 - Model: [Qwen2.5 7B-AWQ (quantized)](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-AWQ)
 
 ### Test Parameters
@@ -49,102 +51,51 @@ This represents a practical, real-world scenario for organizations deploying sma
 
 1. Setup:
    - Started with a clean Ubuntu 22 machine with only CUDA & Conda environments installed
-   - No other GPU-intensive processes running during tests
+   - No other GPU processes running during tests as nvidia-smi shows zero usage.
+
 2. First SGLang testing:
-   - Start the SGLang server, `python3 -m sglang.launch_server --model-path $MODEL_PATH --max-total-tokens 8192`
-   - Run the SGLang stress test script, which is provided as-is and may benefit from further refinement
+   - Start the SGLang server, `python3 -m sglang.launch_server --model-path $MODEL_PATH --context-length 8192`
+   - Run the SGLang stress test script (which is provided as-is and may benefit from further refinement)
    - Record the performance metrics
+
 3. For vLLM testing:
    - Stop the SGLang server
    - Start the vLLM server, `vllm serve $MODEL_PATH --max-model-len 8192`
-   - Run the vLLM stress test script(which is provided as-is and may benefit from further refinement)
+   - Run the vLLM stress test script
    - Record the performance metrics
+
+4. Repeat for both single and dual GPU configurations
 
 ## Key Findings
 
 ### The most striking finding
 
-The most striking finding is from the GPU usage report. While SGLang delivers higher throughput than vLLM, more consistent response times, and similar or better token generation rates, it does so with dramatically less memory usage:
+The most striking discovery from this testing is the dramatic reversal in performance characteristics between single-GPU and multi-GPU configurations:
 
-| Metric                     | SGLang              | vLLM                 |
-| -------------------------- | ------------------- | -------------------- |
-| Memory Usage               | **7,712 MiB (33%)** | **21,058 MiB (91%)** |
-| GPU Utilization            | 92%                 | 93%                  |
-| Power Consumption          | 151W                | 145W                 |
-| Temperature                | 49°C                | 50°C                 |
-| Throughput (30 concurrent) | 14.92 req/s         | 9.50 req/s           |
+1. **In single-GPU scenarios**: SGLang demonstrated extremely consistent response times, higher throughput, and comparable memory usage when properly configured.
 
-The patterns are remarkably consistent:
+2. **In multi-GPU scenarios**: vLLM maintained consistent performance while SGLang showed significant variability and decreased throughput.
 
-1. **Similar GPU computational intensity**: Both frameworks use around 92-93% of the GPU's compute capacity
-2. **Dramatically different memory efficiency**: SGLang uses less than half the memory of vLLM
-3. **Similar power profiles**: Both use around 145-151W
+This unexpected contrast suggests that these frameworks optimize differently for different hardware configurations, with important implications for deployment decisions.
 
-What makes this particularly impressive is that SGLang is delivering about **57% higher** throughput while using **63% less memory**. The computational efficiency difference is substantial.
+## Single-GPU Results
 
-This memory efficiency has significant practical implications:
-- Ability to serve larger models on the same hardware
-- Run multiple models simultaneously on a single GPU
-- Reduce cloud infrastructure costs where GPU memory is a primary cost driver
-- Support more concurrent users without hardware upgrades
+### Memory Usage (with correct parameter configuration)
 
-### `nvidia-smi` result sample for **SGLang** 
-
-```
-+-----------------------------------------------------------------------------------------+
-| Processes:                                                                              |
-|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
-|        ID   ID                                                               Usage      |
-|=========================================================================================|
-|    0   N/A  N/A      8715      C   sglang::scheduler_TP0                        7706MiB |
-+-----------------------------------------------------------------------------------------+
-Fri Apr 25 22:21:23 2025       
-+-----------------------------------------------------------------------------------------+
-| NVIDIA-SMI 550.127.08             Driver Version: 550.127.08     CUDA Version: 12.4     |
-|-----------------------------------------+------------------------+----------------------+
-| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
-| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
-|                                         |                        |               MIG M. |
-|=========================================+========================+======================|
-|   0  NVIDIA A10                     On  |   00000000:00:07.0 Off |                    0 |
-|  0%   49C    P0            148W /  150W |    7712MiB /  23028MiB |     91%      Default |
-|                                         |                        |                  N/A |
-+-----------------------------------------+------------------------+----------------------+
-```
-
-### `nvidia-smi` result sample for **vLLM** 
-
-```
-+-----------------------------------------------------------------------------------------+
-| Processes:                                                                              |
-|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
-|        ID   ID                                                               Usage      |
-|=========================================================================================|
-|    0   N/A  N/A      8371      C   ...iniconda3/envs/vllm_env/bin/python3      21052MiB |
-+-----------------------------------------------------------------------------------------+
-Fri Apr 25 22:19:31 2025       
-+-----------------------------------------------------------------------------------------+
-| NVIDIA-SMI 550.127.08             Driver Version: 550.127.08     CUDA Version: 12.4     |
-|-----------------------------------------+------------------------+----------------------+
-| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
-| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
-|                                         |                        |               MIG M. |
-|=========================================+========================+======================|
-|   0  NVIDIA A10                     On  |   00000000:00:07.0 Off |                    0 |
-|  0%   50C    P0            153W /  150W |   21058MiB /  23028MiB |     95%      Default |
-|                                         |                        |                  N/A |
-+-----------------------------------------+------------------------+----------------------+
-```
+| Metric                     | SGLang          | vLLM           |
+| -------------------------- | --------------- | -------------- |
+| Memory Usage               | 20996 MiB (91%) | 21058MiB (91%) |
+| GPU Utilization            | 92%             | 93%            |
+| Power Consumption          | 151W            | 145W           |
+| Temperature                | 49°C            | 50°C           |
+| Throughput (30 concurrent) | 14.92 req/s     | 9.50 req/s     |
 
 ### Performance Metrics
-- **Memory Usage**: SGLang used ~33% of GPU memory vs. vLLM's ~91% for the same model
-- **Response Time**: SGLang demonstrated more **consistent** response times (lower standard deviation)
-- **Throughput**: At 30 concurrent requests, SGLang achieved ~57% higher throughput
+- **Response Time Consistency**: SGLang demonstrated remarkably consistent response times (std dev of just 0.01s)
+- **Throughput**: SGLang achieved ~57% higher throughput than vLLM
 - **GPU Utilization**: Both frameworks utilized the GPU efficiently (91-95%)
 
-## Detailed Results
-
-### Test result samples
+### Single-GPU Test Results Summary
 
 #### SGLang for 5 Concurrent Requests (20 total)
 
@@ -212,15 +163,16 @@ Test completed in 7.56 seconds
 └────────────────────────────┴──────────────────────────────────────┘
 ```
 
-### Summary Comparison Tables
+Refer to the complete result [here](./OneA10-test-result-samples.md)
+
+### Single-GPU Comparison
 
 #### 5 Concurrent Requests (20 total)
 | Metric | SGLang | vLLM |
 |--------|--------|------|
-| Avg Response Time | 1.51s | 1.72s |
-| Std Dev | 0.01s | 0.25s |
-| Throughput | 3.31 req/s | 2.46 req/s |
-| Memory Usage | 7.7 GB | 21.1 GB |
+| Avg Response Time | 1.51s | 1.64s |
+| Std Dev | 0.01s | 0.20s |
+| Throughput | 3.31 req/s | 2.65 req/s |
 
 #### 30 Concurrent Requests (300 total)
 | Metric | SGLang | vLLM |
@@ -230,44 +182,228 @@ Test completed in 7.56 seconds
 | Throughput | 14.92 req/s | 9.50 req/s |
 | Token Generation | 1544.94 tok/s | 961.05 tok/s |
 
-## SGLang Performance Analysis
+## Multi-GPU Results
 
-The SGLang results show several impressive performance characteristics:
+When testing with 2 A10 GPUs, the performance characteristics reversed dramatically:
 
-1. **Extremely consistent response times** - The standard deviation is only 0.01 seconds, and there's virtually no difference between min (1.51s) and max (1.52s) response times. This is remarkable consistency that's very rare in LLM inference.
-2. **High token generation speed** - 341.08 tokens per second overall is excellent for a 7B parameter model, especially if it's running on a single GPU.
-3. **Very low latency** - The average response time of 1.51 seconds for generating ~103 tokens per request is quite fast.
-4. **Efficient batch processing** - The fact that the actual throughput (3.31 req/s) is significantly higher than what you'd expect from the response time alone suggests that SGLang is efficiently batching these requests.
+### Multi-GPU Test Results
 
-This combination is quite remarkable and suggests SGLang is using sophisticated compilation techniques to optimize the inference process. The dramatically lower memory footprint with similar computational intensity points to:
+#### SGLang with 30 Concurrent Requests (300 total)
 
-1. Better memory layout and access patterns
-2. More efficient kernel implementations
-3. Possibly specialized optimizations for this particular model architecture
+```
+Test completed in 36.91 seconds
+        SGLang Stress Test Results - 2025-04-27 14:00:37        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                           ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ URL                        │ http://localhost:30000/generate │
+│ Max Tokens                 │ 256                             │
+│ Concurrent Requests        │ 30                              │
+│ Total Requests             │ 300                             │
+│ Successful Requests        │ 300 (100.0%)                    │
+│ Failed Requests            │ 0 (0.0%)                        │
+│ Total Test Duration        │ 36.91 seconds                   │
+│ Min Response Time          │ 1.55 seconds                    │
+│ Max Response Time          │ 8.58 seconds                    │
+│ Average Response Time      │ 3.23 seconds                    │
+│ Median Response Time       │ 2.31 seconds                    │
+│ P90 Response Time          │ 8.53 seconds                    │
+│ P95 Response Time          │ 8.55 seconds                    │
+│ P99 Response Time          │ 8.58 seconds                    │
+│ Std Dev Response Time      │ 1.94 seconds                    │
+│ Theoretical Max Throughput │ 34.97 requests/second           │
+│ Actual Throughput          │ 8.13 requests/second            │
+│ Total Generated Tokens     │ 31515                           │
+│ Tokens Per Second          │ 853.94                          │
+│ Avg Tokens Per Request     │ 105.05                          │
+│ Peak Requests In Flight    │ 30                              │
+└────────────────────────────┴─────────────────────────────────┘
+```
 
-For production deployments, SGLang's memory efficiency would allow you to:
+#### Another SGLang run showing even higher variance:
 
-- Run larger batch sizes
-- Handle more concurrent users
-- Potentially fit larger models in the same GPU
-- Run multiple model instances on a single GPU
+```
+Test completed in 60.97 seconds
+        SGLang Stress Test Results - 2025-04-27 14:10:34        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                           ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ URL                        │ http://localhost:30000/generate │
+│ Max Tokens                 │ 256                             │
+│ Concurrent Requests        │ 30                              │
+│ Total Requests             │ 300                             │
+│ Successful Requests        │ 300 (100.0%)                    │
+│ Failed Requests            │ 0 (0.0%)                        │
+│ Total Test Duration        │ 60.97 seconds                   │
+│ Min Response Time          │ 1.52 seconds                    │
+│ Max Response Time          │ 12.37 seconds                   │
+│ Average Response Time      │ 4.44 seconds                    │
+│ Median Response Time       │ 3.81 seconds                    │
+│ P90 Response Time          │ 6.30 seconds                    │
+│ P95 Response Time          │ 11.51 seconds                   │
+│ P99 Response Time          │ 12.37 seconds                   │
+│ Std Dev Response Time      │ 2.37 seconds                    │
+│ Theoretical Max Throughput │ 24.26 requests/second           │
+│ Actual Throughput          │ 4.92 requests/second            │
+│ Total Generated Tokens     │ 31214                           │
+│ Tokens Per Second          │ 511.92                          │
+│ Avg Tokens Per Request     │ 104.05                          │
+│ Peak Requests In Flight    │ 30                              │
+└────────────────────────────┴─────────────────────────────────┘
+```
 
-These characteristics make SGLang particularly attractive for high-throughput production environments where GPU memory is often the limiting factor.
+#### vLLM with 30 Concurrent Requests (300 total)
 
-## vLLM Performance Analysis
+```
+           vLLM Stress Test Results - 2025-04-27 14:26:27            
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                                ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ URL                        │ http://localhost:8000/v1/completions │
+│ Model                      │ /home/vllm/llm/Qwen7B-awq            │
+│ Max Tokens                 │ 256                                  │
+│ Temperature                │ 0.7                                  │
+│ Concurrent Requests        │ 30                                   │
+│ Total Requests             │ 300                                  │
+│ Successful Requests        │ 300 (100.0%)                         │
+│ Failed Requests            │ 0 (0.0%)                             │
+│ Total Test Duration        │ 27.73 seconds                        │
+│ Min Response Time          │ 1.34 seconds                         │
+│ Max Response Time          │ 2.97 seconds                         │
+│ Average Response Time      │ 2.26 seconds                         │
+│ Median Response Time       │ 2.28 seconds                         │
+│ P90 Response Time          │ 2.62 seconds                         │
+│ P95 Response Time          │ 2.71 seconds                         │
+│ P99 Response Time          │ 2.85 seconds                         │
+│ Std Dev Response Time      │ 0.27 seconds                         │
+│ Theoretical Max Throughput │ 101.01 requests/second               │
+│ Actual Throughput          │ 10.82 requests/second                │
+│ Total Generated Tokens     │ 29779                                │
+│ Tokens Per Second          │ 1074.01                              │
+│ Avg Tokens Per Request     │ 99.26                                │
+│ Peak Requests In Flight    │ 30                                   │
+└────────────────────────────┴──────────────────────────────────────┘
+```
 
-While vLLM's performance was less impressive in this specific test configuration, it's worth noting some of its strengths:
+#### Another vLLM run showing similar consistency:
 
-1. **Mature ecosystem** - vLLM has a more established ecosystem and wider adoption
-2. **OpenAI-compatible API** - Makes it easier to integrate with existing applications
-3. **Good scaling** - While not tested here, vLLM is known to scale well across multiple GPUs
-4. **Active development** - The project continues to receive regular performance improvements
+```
+Test completed in 29.73 seconds
+           vLLM Stress Test Results - 2025-04-27 14:25:12            
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                                ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ URL                        │ http://localhost:8000/v1/completions │
+│ Model                      │ /home/vllm/llm/Qwen7B-awq            │
+│ Max Tokens                 │ 256                                  │
+│ Temperature                │ 0.7                                  │
+│ Concurrent Requests        │ 30                                   │
+│ Total Requests             │ 300                                  │
+│ Successful Requests        │ 300 (100.0%)                         │
+│ Failed Requests            │ 0 (0.0%)                             │
+│ Total Test Duration        │ 29.72 seconds                        │
+│ Min Response Time          │ 1.23 seconds                         │
+│ Max Response Time          │ 3.62 seconds                         │
+│ Average Response Time      │ 2.32 seconds                         │
+│ Median Response Time       │ 2.35 seconds                         │
+│ P90 Response Time          │ 2.60 seconds                         │
+│ P95 Response Time          │ 2.70 seconds                         │
+│ P99 Response Time          │ 3.32 seconds                         │
+│ Std Dev Response Time      │ 0.28 seconds                         │
+│ Theoretical Max Throughput │ 82.83 requests/second                │
+│ Actual Throughput          │ 10.09 requests/second                │
+│ Total Generated Tokens     │ 30492                                │
+│ Tokens Per Second          │ 1025.81                              │
+│ Avg Tokens Per Request     │ 101.64                               │
+│ Peak Requests In Flight    │ 30                                   │
+└────────────────────────────┴──────────────────────────────────────┘
+```
 
-vLLM has been traditionally known for its efficient KV cache management, which can make it suitable for serving very large models with long context lengths. Its higher memory usage might be a trade-off for flexibility in handling variable batch sizes and context lengths.
+### Multi-GPU Comparison
+
+| Metric                | SGLang (Run 1) | SGLang (Run 2) | vLLM (Run 1) | vLLM (Run 2) |
+|-----------------------|----------------|----------------|--------------|--------------|
+| Min Response Time     | 1.55s          | 1.52s          | 1.34s        | 1.23s        |
+| Max Response Time     | 8.58s          | 12.37s         | 2.97s        | 3.62s        |
+| Average Response Time | 3.23s          | 4.44s          | 2.26s        | 2.32s        |
+| Std Dev Response Time | 1.94s          | 2.37s          | 0.27s        | 0.28s        |
+| Actual Throughput     | 8.13 req/s     | 4.92 req/s     | 10.82 req/s  | 10.09 req/s  |
+| Tokens Per Second     | 853.94         | 511.92         | 1074.01      | 1025.81      |
+
+Refer to the complete result [here](./TwoA10-test-result-samples.md)
+
+## The `--max-total-tokens` Misunderstanding
+
+Early in the testing process, I encountered what appeared to be a dramatic difference in memory usage between the two frameworks:
+
+| Metric       | SGLang              | vLLM                 |
+| ------------ | ------------------- | -------------------- |
+| Memory Usage | **7,712 MiB (33%)** | **21,058 MiB (91%)** |
+
+This initially led me to believe that SGLang had extraordinary memory efficiency compared to vLLM. However, after further investigation, I discovered this was due to a misunderstanding of parameter equivalence between the frameworks.
+
+### What Happened
+
+When launching SGLang, I used:
+
+```
+python3 -m sglang.launch_server --model-path /home/vllm/llm/Qwen7B-awq/ --max-total-tokens 8192
+```
+
+While for vLLM, I used:
+
+```
+vllm serve qwen7B-awq --port 8000 --max-model-len 8192
+```
+
+The key insight: `--max-total-tokens` in SGLang is **not** equivalent to `--max-model-len` in vLLM. The proper equivalent parameter is `--context-length`.
+
+### The Correction
+
+After correcting the parameter to `--context-length` in SGLang, the memory usage became comparable between the frameworks. This experience highlights:
+
+1. The importance of understanding parameter equivalence when benchmarking different frameworks
+2. How seemingly minor configuration differences can dramatically impact resource utilization
+3. The necessity of careful parameter selection when deploying these frameworks in production
+
+This misunderstanding initially led to incorrect conclusions about memory efficiency, but ultimately provided valuable insight into how these frameworks allocate resources differently. It's a reminder that proper configuration is as important as the framework choice itself.
+
+## Performance Analysis
+
+### SGLang Performance Analysis
+
+In the single-GPU configuration, SGLang demonstrated several impressive performance characteristics:
+
+1. **Extremely consistent response times** - The standard deviation was only 0.01 seconds, with virtually no difference between min (1.51s) and max (1.52s) response times. This consistency is rare in LLM inference.
+2. **High token generation speed** - 333 tokens per second for low concurrency and up to 1544 tokens per second at higher concurrency
+3. **Very low latency** - Average response times of 1.51 seconds for generating ~100 tokens per request
+4. **Efficient batch processing** - Effective handling of concurrent requests in a single GPU
+
+However, in multi-GPU setups, SGLang showed significant performance degradation:
+
+1. **Highly variable response times** - Standard deviation increased to 1.94-2.37 seconds
+2. **Wide latency range** - Response times varied from as low as 1.52s to as high as 12.37s
+3. **Reduced throughput** - Both absolute throughput and scaling efficiency declined
+4. **Unpredictable performance** - Large variance between test runs
+
+### vLLM Performance Analysis
+
+vLLM showed different strengths depending on the deployment configuration:
+
+In single-GPU setups:
+1. **Good but not exceptional response times** - Average of 1.64-2.57 seconds
+2. **Moderate consistency** - Standard deviation of 0.20-0.30 seconds
+3. **Solid throughput** - 2.65-9.50 requests per second depending on concurrency
+
+vLLM truly shined in multi-GPU setups:
+1. **Consistent response times** - Maintained low standard deviation (0.27-0.28 seconds)
+2. **Predictable latency range** - Tight band between min and max response times
+3. **Higher throughput** - Outperformed SGLang in actual requests per second
+4. **Stable performance** - Consistent results across multiple test runs
 
 ## Warm-up Effect
 
-Compared to vLLM, SGLang exhibits a "warm-up" effect:
+SGLang exhibits a "warm-up" effect:
 
 ### SGLang Performance: First Run vs. Warmed Up (5 concurrent requests)
 
@@ -281,17 +417,15 @@ Compared to vLLM, SGLang exhibits a "warm-up" effect:
 2. After warm-up, consistency improves dramatically (std dev 0.01s)
 3. Throughput increases slightly after warm-up
 
-This behavior is actually common in many ML inference systems, including those using JIT compilation or optimization techniques. The system seems to optimize based on the observed workload patterns.
+This behavior is common in systems using JIT compilation or optimization techniques. The system seems to optimize based on the observed workload patterns.
 
-In a fair comparison with vLLM (which showed std dev of 0.25s), SGLang's first run is actually quite comparable in terms of consistency. However, after warm-up, SGLang pulls significantly ahead.
+In a fair comparison with vLLM (which showed std dev of 0.25s), SGLang's first run is quite comparable in terms of consistency. However, after warm-up, SGLang pulls significantly ahead in single-GPU deployments.
 
 For production deployments, this suggests:
 
 1. You might want to "prime" SGLang with some initial requests before sending production traffic
-2. The consistency advantage becomes even more pronounced in long-running services
-3. Both systems show similar cold-start behavior, but SGLang optimizes more effectively over time
-
-This makes SGLang particularly well-suited for persistent services rather than serverless or on-demand deployments where cold starts might be frequent.
+2. The consistency advantage becomes pronounced in long-running single-GPU services
+3. Both systems show similar cold-start behavior, but SGLang optimizes more effectively over time on single GPUs
 
 ## Limitations and Suggestions
 
@@ -301,7 +435,7 @@ This makes SGLang particularly well-suited for persistent services rather than s
 2. **Prompt diversity**: Using similar/identical prompts might not represent varied real-world workloads
 3. **Configuration optimization**: Each framework might benefit from different configuration parameters
 4. **Output token variability**: If the number of generated tokens varies between tests, it can affect timing
-5. **Single model architecture**: Results might vary with different model architectures or sizes
+5. **Limited model architectures**: Results might vary with different model architectures or sizes
 6. **Lack of error handling testing**: How systems perform under error conditions wasn't evaluated
 
 ### Suggestions for More Comprehensive Testing
@@ -353,15 +487,32 @@ This testing aims to provide a reasonable comparison under specific conditions, 
 
 ## Conclusion
 
-SGLang demonstrated significant memory efficiency advantages while delivering higher throughput and more consistent response times for this specific model and test configuration. The 63% lower memory usage combined with 57% higher throughput makes it particularly suitable for environments where maximizing GPU utilization is critical.
+The performance comparison between SGLang and vLLM yielded surprising and nuanced results that highlight how scaling affects these frameworks differently:
 
-One of the most intriguing questions raised by this research is: **Why can SGLang operate with only one-third of the GPU memory compared to vLLM while delivering better performance?** This dramatic efficiency difference warrants further investigation by the community and could have significant implications for future LLM inference optimization.
+### Single-GPU Performance (A10)
+In the single A10 GPU scenario, SGLang demonstrated remarkable advantages:
+- **Response consistency**: Extremely consistent response times (std dev of just 0.01s)
+- **Throughput**: ~57% higher throughput than vLLM
+- **Token generation**: Faster token generation rate
 
-However, the optimal choice between frameworks depends on your specific use case, hardware, and requirements. vLLM remains a solid choice for many deployments, especially where its mature ecosystem and compatibility with OpenAI APIs are valuable.
+### Multi-GPU Performance (2x A10)
+When testing with 2 A10 GPUs, the performance characteristics reversed dramatically:
+- **Response consistency**: vLLM maintained consistent response times (std dev of 0.27s), while SGLang showed extreme variability (std dev up to 2.37s)
+- **Response time range**: vLLM maintained a tight range (1.34s-2.97s) compared to SGLang's dramatic spread (as wide as 1.52s-12.37s in some tests)
+- **Throughput**: vLLM achieved more than double the throughput in worst cases (10.82 req/s vs as low as 4.92 req/s for SGLang)
+- **Predictability**: vLLM offered much more predictable performance at scale, critical for production systems
 
-Future work could explore performance with larger models, multi-GPU setups, and more diverse workloads to provide a more comprehensive comparison.
+### Key Insights
+These findings suggest that:
+1. **Framework strengths vary by scale**: The two frameworks optimize differently for single vs. multi-GPU deployments
+2. **Deployment architecture matters**: Your hardware configuration should strongly influence your framework choice
+3. **No one-size-fits-all solution**: Each framework has scenarios where it excels
 
-I encourage users to run their own tests with workloads representative of their actual production needs.
+One of the most valuable questions for the community to explore is: **Why does SGLang's performance consistency degrade in multi-GPU settings while vLLM maintains or improves its consistency?** Understanding these scaling behaviors could provide important insights for both framework developers and users.
+
+The optimal choice between frameworks clearly depends on your specific use case, hardware configuration, and requirements. For single-GPU deployments, SGLang's consistency and efficiency are compelling. For multi-GPU setups, vLLM appears to maintain better scaling characteristics.
+
+I encourage users to run their own tests with workloads representative of their actual production needs and hardware configurations.
 
 ## Contributing
 

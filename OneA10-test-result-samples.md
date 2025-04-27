@@ -147,6 +147,8 @@ Test completed in 20.05 seconds
 │ Peak Requests In Flight    │ 30                              │
 └────────────────────────────┴─────────────────────────────────┘
 
+/******  When I wrongly set `--max-total-tokens` instead of `context-length` ******/
+/****** I was surprised sglang only used 7G memory  *****/
 
 +-----------------------------------------------------------------------------------------+
 | Processes:                                                                              |
