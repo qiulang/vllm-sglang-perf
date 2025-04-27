@@ -54,13 +54,13 @@ This represents a practical, real-world scenario for organizations deploying sma
    - No other GPU processes running during tests as nvidia-smi shows zero usage.
 
 2. First SGLang testing:
-   - Start the SGLang server, `python3 -m sglang.launch_server --model-path $MODEL_PATH --context-length 8192`
+   - Start the SGLang server, `python3 -m sglang.launch_server --model-path $MODEL_PATH --context-length 8192 --dp 1 or 2`
    - Run the SGLang stress test script (which is provided as-is and may benefit from further refinement)
    - Record the performance metrics
 
 3. For vLLM testing:
    - Stop the SGLang server
-   - Start the vLLM server, `vllm serve $MODEL_PATH --max-model-len 8192`
+   - Start the vLLM server, `vllm serve $MODEL_PATH --max-model-len 8192 --tensor-parallel-size 1 or 2`
    - Run the vLLM stress test script
    - Record the performance metrics
 
@@ -76,7 +76,7 @@ The most striking discovery from this testing is the dramatic reversal in perfor
 
 2. **In multi-GPU scenarios**: vLLM maintained consistent performance while SGLang showed significant variability and decreased throughput.
 
-This unexpected contrast suggests that these frameworks optimize differently for different hardware configurations, with important implications for deployment decisions.
+3. **Unexpected scaling behavior for SGLang** : When testing SGLang on 2 A10 GPUs compared to a single A10 GPU, performance surprisingly **degraded rather than improved**. With 2 GPUs, SGLang showed significantly higher response time variance (std dev increasing from 0.01s to 1.94-2.37s) and less predictable throughput (for 5 & 30 concyrrent requests). This counter-intuitive finding suggests that SGLang may be optimized for single-GPU performance, and its current implementation might not efficiently distribute work across multiple GPUs.  Refer to the test result [here](./TwoA10-test-result-samples.md)
 
 ## Single-GPU Results
 
@@ -251,6 +251,11 @@ Test completed in 60.97 seconds
 │ Peak Requests In Flight    │ 30                              │
 └────────────────────────────┴─────────────────────────────────┘
 ```
+
+**For 2 A10 GPU, SGLang showed significantly higher response time variance and less predictable throughput.** At the first it is hard to believe this, so I test many times to confirmed that.
+
+For 2 A10 GPU, vLLM indeed showed a slightly better result for 1 A10 GPU.
+
 
 #### vLLM with 30 Concurrent Requests (300 total)
 

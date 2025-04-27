@@ -11,7 +11,7 @@ https://docs.sglang.ai/backend/server_arguments.html
 ```
 python -m sglang.launch_server --model-path /home/vllm/llm/Qwen7B-awq --context-length 8192 --dp 2
 
-
+// A snapshot of when test finished the power dropped to 53W
 +-----------------------------------------------------------------------------------------+
 | Processes:                                                                              |
 |  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
@@ -667,5 +667,132 @@ Test completed in 5.53 seconds
 │ Avg Tokens Per Request     │ 95.40                                │
 │ Peak Requests In Flight    │ 5                                    │
 └────────────────────────────┴──────────────────────────────────────┘
+```
+
+
+
+### One A10 has much better results for SGLang
+
+For 5 & 30 concurrent requests, 2 A10 consistenly show unpredicted results!
+
+```
+Test completed in 11.02 seconds
+        SGLang Stress Test Results - 2025-04-27 18:08:38        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                           ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ URL                        │ http://localhost:30000/generate │
+│ Max Tokens                 │ 256                             │
+│ Concurrent Requests        │ 5                               │
+│ Total Requests             │ 20                              │
+│ Successful Requests        │ 20 (100.0%)                     │
+│ Failed Requests            │ 0 (0.0%)                        │
+│ Total Test Duration        │ 11.02 seconds                   │
+│ Min Response Time          │ 1.67 seconds                    │
+│ Max Response Time          │ 5.09 seconds                    │
+│ Average Response Time      │ 2.58 seconds                    │
+│ Median Response Time       │ 2.08 seconds                    │
+│ P90 Response Time          │ 4.53 seconds                    │
+│ P95 Response Time          │ 5.09 seconds                    │
+│ P99 Response Time          │ 5.09 seconds                    │
+│ Std Dev Response Time      │ 1.17 seconds                    │
+│ Theoretical Max Throughput │ 3.93 requests/second            │
+│ Actual Throughput          │ 1.82 requests/second            │
+│ Total Generated Tokens     │ 2077                            │
+│ Tokens Per Second          │ 188.56                          │
+│ Avg Tokens Per Request     │ 103.85                          │
+│ Peak Requests In Flight    │ 5                               │
+└────────────────────────────┴─────────────────────────────────┘
+
+Test completed in 38.49 seconds
+        SGLang Stress Test Results - 2025-04-27 18:05:16        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                           ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ URL                        │ http://localhost:30000/generate │
+│ Max Tokens                 │ 256                             │
+│ Concurrent Requests        │ 30                              │
+│ Total Requests             │ 300                             │
+│ Successful Requests        │ 300 (100.0%)                    │
+│ Failed Requests            │ 0 (0.0%)                        │
+│ Total Test Duration        │ 38.49 seconds                   │
+│ Min Response Time          │ 1.92 seconds                    │
+│ Max Response Time          │ 8.23 seconds                    │
+│ Average Response Time      │ 3.11 seconds                    │
+│ Median Response Time       │ 2.63 seconds                    │
+│ P90 Response Time          │ 5.08 seconds                    │
+│ P95 Response Time          │ 6.09 seconds                    │
+│ P99 Response Time          │ 8.17 seconds                    │
+│ Std Dev Response Time      │ 1.27 seconds                    │
+│ Theoretical Max Throughput │ 36.46 requests/second           │
+│ Actual Throughput          │ 7.79 requests/second            │
+│ Total Generated Tokens     │ 31184                           │
+│ Tokens Per Second          │ 810.18                          │
+│ Avg Tokens Per Request     │ 103.95                          │
+│ Peak Requests In Flight    │ 30                              │
+└────────────────────────────┴─────────────────────────────────┘
+
+```
+
+
+
+Comapred to One A10 result
+
+```
+Test completed in 6.11 seconds
+        SGLang Stress Test Results - 2025-04-27 18:10:03        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                           ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ URL                        │ http://localhost:30000/generate │
+│ Max Tokens                 │ 256                             │
+│ Concurrent Requests        │ 5                               │
+│ Total Requests             │ 20                              │
+│ Successful Requests        │ 20 (100.0%)                     │
+│ Failed Requests            │ 0 (0.0%)                        │
+│ Total Test Duration        │ 6.11 seconds                    │
+│ Min Response Time          │ 1.50 seconds                    │
+│ Max Response Time          │ 1.59 seconds                    │
+│ Average Response Time      │ 1.53 seconds                    │
+│ Median Response Time       │ 1.51 seconds                    │
+│ P90 Response Time          │ 1.59 seconds                    │
+│ P95 Response Time          │ 1.59 seconds                    │
+│ P99 Response Time          │ 1.59 seconds                    │
+│ Std Dev Response Time      │ 0.04 seconds                    │
+│ Theoretical Max Throughput │ 12.55 requests/second           │
+│ Actual Throughput          │ 3.27 requests/second            │
+│ Total Generated Tokens     │ 2083                            │
+│ Tokens Per Second          │ 340.76                          │
+│ Avg Tokens Per Request     │ 104.15                          │
+│ Peak Requests In Flight    │ 5                               │
+└────────────────────────────┴─────────────────────────────────┘
+
+Test completed in 20.37 seconds
+        SGLang Stress Test Results - 2025-04-27 18:12:37        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                           ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ URL                        │ http://localhost:30000/generate │
+│ Max Tokens                 │ 256                             │
+│ Concurrent Requests        │ 30                              │
+│ Total Requests             │ 300                             │
+│ Successful Requests        │ 300 (100.0%)                    │
+│ Failed Requests            │ 0 (0.0%)                        │
+│ Total Test Duration        │ 20.37 seconds                   │
+│ Min Response Time          │ 2.02 seconds                    │
+│ Max Response Time          │ 2.04 seconds                    │
+│ Average Response Time      │ 2.03 seconds                    │
+│ Median Response Time       │ 2.04 seconds                    │
+│ P90 Response Time          │ 2.04 seconds                    │
+│ P95 Response Time          │ 2.04 seconds                    │
+│ P99 Response Time          │ 2.04 seconds                    │
+│ Std Dev Response Time      │ 0.01 seconds                    │
+│ Theoretical Max Throughput │ 146.75 requests/second          │
+│ Actual Throughput          │ 14.73 requests/second           │
+│ Total Generated Tokens     │ 31032                           │
+│ Tokens Per Second          │ 1523.72                         │
+│ Avg Tokens Per Request     │ 103.44                          │
+│ Peak Requests In Flight    │ 30                              │
+└────────────────────────────┴─────────────────────────────────┘
 ```
 
