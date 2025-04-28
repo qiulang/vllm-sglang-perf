@@ -21,7 +21,7 @@
 
 SGLang and vLLM are both high-performance inference frameworks for large language models, with SGLang taking a compilation-based approach while vLLM focuses on optimized attention and memory management.
 
-Before starting this comparison, I had no bias toward either framework and was simply curious about their relative performance. The results turned out to be quite surprising and nuanced, with each framework showing distinct advantages in different deployment scenarios.
+Before starting this comparison, I had no bias toward either framework and was simply curious about their relative performance. The comparative analysis revealed important nuances about configuration impacts, with each framework exhibiting specific performance advantages in different deployment scenarios depending on parallelism strategies and parameter settings.
 
 Benchmark testing without clear objectives can often be misleading and produce non-objective results. However, this project has a specific, focused goal: to evaluate how vLLM and SGLang perform when running a small LLM model on a **mid-range** NVIDIA GPU like A10, in both single and multi-GPU configurations.
 
@@ -54,7 +54,7 @@ This represents a practical, real-world scenario for organizations deploying sma
    - No other GPU processes running during tests as nvidia-smi shows zero usage.
 
 2. First SGLang testing:
-   - Start the SGLang server, `python3 -m sglang.launch_server --model-path $MODEL_PATH --context-length 8192 --dp 1|2|4`
+   - Start the SGLang server, `python3 -m sglang.launch_server --model-path $MODEL_PATH --context-length 8192 --tp 1|2|4`
    - Run the SGLang stress test script (which is provided as-is and may benefit from further refinement)
    - Record the performance metrics
 
@@ -68,21 +68,19 @@ This represents a practical, real-world scenario for organizations deploying sma
 
 ## Key Findings
 
-### The most striking finding
-
-The most striking discovery from this testing is the dramatic reversal in performance characteristics between single-GPU and multi-GPU configurations:
-
 1. **In single-GPU scenarios**: SGLang demonstrated extremely consistent response times, higher throughput, and comparable memory usage when properly configured.
 
-2. **In multi-GPU scenarios**: vLLM maintained consistent performance while SGLang showed significant variability and decreased throughput.
+2. **In multi-GPU scenarios with data parallelism**: vLLM maintained consistent performance while SGLang showed significant variability and decreased throughput when using the `--dp` (data parallelism) flag.
 
-3. **Unexpected scaling behavior for SGLang** : When testing SGLang on 2 A10 GPUs compared to a single A10 GPU, performance surprisingly **degraded rather than improved**. With 2 GPUs, SGLang showed significantly higher response time variance (std dev increasing from 0.01s to 1.94-2.37s) and less predictable throughput (for 5 & 30 concyrrent requests). This counter-intuitive finding suggests that SGLang may be optimized for single-GPU performance, and its current implementation might not efficiently distribute work across multiple GPUs.  Refer to the test result [here](./TwoA10-test-result-samples.md)
+3. **Unexpected parallelism impact**: When switching SGLang from data parallelism (`--dp`) to tensor parallelism (`--tp`), performance dramatically improved on multi-GPU setups, restoring the consistency and throughput advantages seen in single-GPU scenarios. This parallelism strategy choice had a much larger impact on performance characteristics than expected.
 
-4. To futher comfirm this unexpected scaling behavior for SGLang, I then tested SGLang (vllm as well) on 4 A10 GPUs and got the same result.
+4. **Unanswered question**: Why does tensor parallelism in SGLang provide such dramatically better performance consistency than data parallelism for a model that easily fits on a single GPU? This counter-intuitive finding invites further investigation from the community.
+
+   
 
 ## Single-GPU Results
 
-### Memory Usage (with correct parameter configuration)
+### Memory Usage
 
 | Metric                     | SGLang          | vLLM           |
 | -------------------------- | --------------- | -------------- |
@@ -186,9 +184,26 @@ Refer to the complete result [here](./OneA10-test-result-samples.md)
 
 ## Multi-GPU Results
 
-When testing with **2 A10** GPUs, the performance characteristics **reversed** dramatically:
+For SGLang, the choice between data parallelism (DP) and tensor parallelism (TP) has a major impact on performance characteristics
 
-### Multi-GPU Test Results
+### The Parallelism Strategy Discovery
+
+During this testing, a critical discovery was made regarding SGLang's multi-GPU performance. Initially, SGLang was configured with the `--dp` flag (data parallelism) for multi-GPU tests, based on my assumption that data parallelism is better for throughput when there's enough memory, refer to https://docs.sglang.ai/backend/server_arguments.html. The Qwen 7B model easily fits on a single A10 GPU's 24GB memory, so this seemed like the right choice.
+
+However, after observing surprisingly poor performance with data parallelism, I got the feedback from https://github.com/sgl-project/sglang/issues/5808 I realize I should use `tp` flag instead.
+
+This resulted in dramatically improved performance, with consistency and throughput comparable to or better than the single-GPU results.
+
+**What happened?**
+
+1. **Data Parallelism (`--dp`)**: When using this approach, each GPU gets a complete copy of the model and handles separate batches independently. While this increases theoretical throughput capacity, it led to highly variable response times and less efficient request processing in practice.
+2. **Tensor Parallelism (`--tp`)**: With this approach, a single model is split across multiple GPUs, with each GPU handling a portion of the model's computation. For our Qwen 7B model, this provided much more consistent response times and better overall throughput.
+
+This finding challenges conventional wisdom about when to use tensor vs. data parallelism. While tensor parallelism is often recommended primarily for models too large to fit on a single GPU, our testing demonstrates it can also be superior for smaller models when consistent response times and efficient multi-GPU scaling are priorities.
+
+### SGLang with Data Parallelism
+
+When testing SGLang on 2 A10 GPUs using the `--dp` (data parallelism) flag, the performance degraded significantly compared to single-GPU operation:
 
 #### SGLang with 30 Concurrent Requests (300 total)
 
@@ -251,15 +266,76 @@ Test completed in 60.97 seconds
 │ Tokens Per Second          │ 511.92                          │
 │ Avg Tokens Per Request     │ 104.05                          │
 │ Peak Requests In Flight    │ 30                              │
-└────────────────────────────┴─────────────────────────────────┘
+└────────────────────────────┴──────────────────────────────── │
+
 ```
 
-**For 2 A10 GPU, SGLang showed significantly higher response time variance and less predictable throughput.** At the first it was hard to believe it, so I tested many times to confirmed that. I then tested on **4 A10** GPU, SGLang still showed this strange behavious. Refer to the complete result [here](./4A10.md)
+### SGLang with Tensor Parallelism
 
-For 2 A10 GPU (and 4 A10 GPU), vLLM indeed showed a slightly better result for 1 A10 GPU.
+When switching to tensor parallelism using the `--tp` flag, SGLang's performance on 2 GPUs dramatically improved, showing similar characteristics to its single-GPU performance:
 
+```
+Test completed in 26.97 seconds
+        SGLang Stress Test Results - 2025-04-28 23:17:05        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                           ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ URL                        │ http://localhost:30000/generate │
+│ Max Tokens                 │ 256                             │
+│ Concurrent Requests        │ 30                              │
+│ Total Requests             │ 300                             │
+│ Successful Requests        │ 300 (100.0%)                    │
+│ Failed Requests            │ 0 (0.0%)                        │
+│ Total Test Duration        │ 26.97 seconds                   │
+│ Min Response Time          │ 2.68 seconds                    │
+│ Max Response Time          │ 2.78 seconds                    │
+│ Average Response Time      │ 2.69 seconds                    │
+│ Median Response Time       │ 2.68 seconds                    │
+│ P90 Response Time          │ 2.78 seconds                    │
+│ P95 Response Time          │ 2.78 seconds                    │
+│ P99 Response Time          │ 2.78 seconds                    │
+│ Std Dev Response Time      │ 0.03 seconds                    │
+│ Theoretical Max Throughput │ 107.73 requests/second          │
+│ Actual Throughput          │ 11.12 requests/second           │
+│ Total Generated Tokens     │ 31221                           │
+│ Tokens Per Second          │ 1157.76                         │
+│ Avg Tokens Per Request     │ 104.07                          │
+│ Peak Requests In Flight    │ 30                              │
+└────────────────────────────┴─────────────────────────────────┘
 
-#### vLLM with 30 Concurrent Requests (300 total) on 2 A10
+Test completed in 26.93 seconds
+        SGLang Stress Test Results - 2025-04-28 23:17:38        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                           ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ URL                        │ http://localhost:30000/generate │
+│ Max Tokens                 │ 256                             │
+│ Concurrent Requests        │ 30                              │
+│ Total Requests             │ 300                             │
+│ Successful Requests        │ 300 (100.0%)                    │
+│ Failed Requests            │ 0 (0.0%)                        │
+│ Total Test Duration        │ 26.93 seconds                   │
+│ Min Response Time          │ 2.68 seconds                    │
+│ Max Response Time          │ 2.70 seconds                    │
+│ Average Response Time      │ 2.69 seconds                    │
+│ Median Response Time       │ 2.69 seconds                    │
+│ P90 Response Time          │ 2.70 seconds                    │
+│ P95 Response Time          │ 2.70 seconds                    │
+│ P99 Response Time          │ 2.70 seconds                    │
+│ Std Dev Response Time      │ 0.01 seconds                    │
+│ Theoretical Max Throughput │ 111.07 requests/second          │
+│ Actual Throughput          │ 11.14 requests/second           │
+│ Total Generated Tokens     │ 31008                           │
+│ Tokens Per Second          │ 1151.33                         │
+│ Avg Tokens Per Request     │ 103.36                          │
+│ Peak Requests In Flight    │ 30                              │
+└────────────────────────────┴─────────────────────────────────┘
+
+```
+
+### vLLM Multi-GPU Results
+
+For comparison, vLLM's results on 2 A10 GPUs:
 
 ```
            vLLM Stress Test Results - 2025-04-27 14:26:27            
@@ -326,18 +402,30 @@ Test completed in 29.73 seconds
 └────────────────────────────┴──────────────────────────────────────┘
 ```
 
-### Multi-GPU Comparison
 
-| Metric                | SGLang (Run 1) | SGLang (Run 2) | vLLM (Run 1) | vLLM (Run 2) |
-|-----------------------|----------------|----------------|--------------|--------------|
-| Min Response Time     | 1.55s          | 1.52s          | 1.34s        | 1.23s        |
-| Max Response Time     | 8.58s          | 12.37s         | 2.97s        | 3.62s        |
-| Average Response Time | 3.23s          | 4.44s          | 2.26s        | 2.32s        |
-| Std Dev Response Time | 1.94s          | 2.37s          | 0.27s        | 0.28s        |
-| Actual Throughput     | 8.13 req/s     | 4.92 req/s     | 10.82 req/s  | 10.09 req/s  |
-| Tokens Per Second     | 853.94         | 511.92         | 1074.01      | 1025.81      |
 
-Refer to the complete result [here](./TwoA10-test-result-samples.md)
+For 4 A10 GPU setting, SGLang with --tp 4 show even better performance compared to 2 A10, Refer to the complete result [here](./4A10.md), while vLLM's improvements is minor maybe due to 50 concurrent request at most.
+
+
+
+### Multi-GPU Comparison with Corrected Parallelism Strategy (30 concurrent requests)
+
+| Metric                | SGLang (DP)     | SGLang (TP)       | vLLM        |
+| --------------------- | --------------- | ----------------- | ----------- |
+| Min Response Time     | 1.52-1.55s      | 2.68s             | 1.34s       |
+| Max Response Time     | 8.58-12.37s     | 2.70-2.78s        | 2.97s       |
+| Average Response Time | 3.23-4.44s      | 2.69s             | 2.26s       |
+| Std Dev Response Time | 1.94-2.37s      | 0.01-0.03s        | 0.27s       |
+| Actual Throughput     | 4.92-8.13 req/s | 11.12-11.14 req/s | 10.82 req/s |
+| Tokens Per Second     | 511-853         | 1151-1158         | 1074        |
+
+What's particularly impressive is that SGLang with tensor parallelism:
+
+1. Shows almost perfect consistency (response times within a 0.02s range in the latest run)
+2. Maintains slightly better throughput than vLLM (11.14 req/s vs 10.82 req/s)
+3. Generates more tokens per second (1151-1158 vs 1074)
+
+These results confirm that the parallelism strategy is crucial for multi-GPU deployments of SGLang, with tensor parallelism providing both better consistency and higher throughput than data parallelism, despite conventional wisdom suggesting data parallelism would be better for throughput with smaller models.
 
 ## The `--max-total-tokens` Misunderstanding
 
@@ -379,19 +467,12 @@ This misunderstanding initially led to incorrect conclusions about memory effici
 
 ### SGLang Performance Analysis
 
-In the single-GPU configuration, SGLang demonstrated several impressive performance characteristics:
+Using tensor parallelism (`--tp`) instead of data parallelism (`--dp`) in multi-GPU configuration, SGLang demonstrated several impressive performance characteristics:
 
 1. **Extremely consistent response times** - The standard deviation was only 0.01 seconds, with virtually no difference between min (1.51s) and max (1.52s) response times. This consistency is rare in LLM inference.
 2. **High token generation speed** - 333 tokens per second for low concurrency and up to 1544 tokens per second at higher concurrency
 3. **Very low latency** - Average response times of 1.51 seconds for generating ~100 tokens per request
 4. **Efficient batch processing** - Effective handling of concurrent requests in a single GPU
-
-However, in multi-GPU setups, SGLang showed significant performance degradation:
-
-1. **Highly variable response times** - Standard deviation increased to 1.94-2.37 seconds
-2. **Wide latency range** - Response times varied from as low as 1.52s to as high as 12.37s
-3. **Reduced throughput** - Both absolute throughput and scaling efficiency declined
-4. **Unpredictable performance** - Large variance between test runs
 
 ### vLLM Performance Analysis
 
@@ -494,32 +575,42 @@ This testing aims to provide a reasonable comparison under specific conditions, 
 
 ## Conclusion
 
-The performance comparison between SGLang and vLLM yielded surprising and nuanced results that highlight how scaling affects these frameworks differently:
+The performance comparison between SGLang and vLLM yielded surprising and nuanced results that highlight important considerations for LLM deployment:
 
-### Single-GPU Performance (A10)
-In the single A10 GPU scenario, SGLang demonstrated remarkable advantages:
-- **Response consistency**: Extremely consistent response times (std dev of just 0.01s)
-- **Throughput**: ~57% higher throughput than vLLM
-- **Token generation**: Faster token generation rate
+### Critical Configuration Discoveries
 
-### Multi-GPU Performance (2x A10)
-When testing with 2 A10 GPUs, the performance characteristics reversed dramatically:
-- **Response consistency**: vLLM maintained consistent response times (std dev of 0.27s), while SGLang showed extreme variability (std dev up to 2.37s)
-- **Response time range**: vLLM maintained a tight range (1.34s-2.97s) compared to SGLang's dramatic spread (as wide as 1.52s-12.37s in some tests)
-- **Throughput**: vLLM achieved more than double the throughput in worst cases (10.82 req/s vs as low as 4.92 req/s for SGLang)
-- **Predictability**: vLLM offered much more predictable performance at scale, critical for production systems
+1. **Parallelism strategy matters enormously**: For SGLang, using tensor parallelism (`--tp`) instead of data parallelism (`--dp`) in multi-GPU setups dramatically improved performance, changing it from significantly worse than vLLM to significantly better.
+2. **Parameter equivalence is critical**: Proper configuration of equivalent parameters across frameworks (`--max-model-len` in vLLM vs. `--context-length` in SGLang) is essential for fair comparisons and optimal resource utilization.
 
-### Key Insights
+### Performance Characteristics
+
+1. SGLang with tensor parallelism excelled in both configurations:
+
+   - Single GPU: Extremely consistent response times (std dev of just 0.01s)
+   - Multiple GPUs with TP: Maintained excellent consistency (std dev of 0.06s) with increased throughput
+   
+2. SGLang with data parallelism performed poorly in multi-GPU tests:
+
+   - High variability (std dev up to 2.37s)
+   - Wide response time range (up to 12.37s)
+   - Lower throughput than both vLLM and tensor-parallel SGLang
+   
+3. vLLM showed good consistency across configurations:
+
+   - Single GPU: Good performance with moderate consistency
+- Multiple GPUs: Maintained consistent performance with improved throughput
+
+### Key Takeaways for Deployment
+
 These findings suggest that:
-1. **Framework strengths vary by scale**: The two frameworks optimize differently for single vs. multi-GPU deployments
-2. **Deployment architecture matters**: Your hardware configuration should strongly influence your framework choice
-3. **No one-size-fits-all solution**: Each framework has scenarios where it excels
 
-One of the most valuable questions for the community to explore is: **Why does SGLang's performance consistency degrade in multi-GPU settings while vLLM maintains or improves its consistency?** Understanding these scaling behaviors could provide important insights for both framework developers and users.
+1. **Framework choice matters**: Different frameworks have different optimal use cases
+2. **Configuration details are critical**: Small changes in configuration can dramatically impact performance
+3. **Test your specific deployment scenario**: Results may vary significantly based on hardware, model, and parallelism strategy
 
-The optimal choice between frameworks clearly depends on your specific use case, hardware configuration, and requirements. For single-GPU deployments, SGLang's consistency and efficiency are compelling. For multi-GPU setups, vLLM appears to maintain better scaling characteristics.
+Most importantly, the impact of parallelism strategy on SGLang highlights that commonly accepted guidelines about when to use tensor vs. data parallelism may need reconsideration. For workloads where response time consistency is a priority, tensor parallelism may be superior even for models that easily fit on a single GPU.
 
-I encourage users to run their own tests with workloads representative of their actual production needs and hardware configurations.
+I encourage users to run their own tests with workloads representative of their actual production needs and hardware configurations, and to experiment with different parallelism strategies rather than following general guidelines without testing.
 
 ## Contributing
 
