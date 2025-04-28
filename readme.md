@@ -64,7 +64,7 @@ This represents a practical, real-world scenario for organizations deploying sma
    - Run the vLLM stress test script
    - Record the performance metrics
 
-4. Repeat for both single and dual GPU configurations
+4. Repeat for both single, dual, quad GPU configurations
 
 ## Key Findings
 
@@ -78,7 +78,7 @@ The most striking discovery from this testing is the dramatic reversal in perfor
 
 3. **Unexpected scaling behavior for SGLang** : When testing SGLang on 2 A10 GPUs compared to a single A10 GPU, performance surprisingly **degraded rather than improved**. With 2 GPUs, SGLang showed significantly higher response time variance (std dev increasing from 0.01s to 1.94-2.37s) and less predictable throughput (for 5 & 30 concyrrent requests). This counter-intuitive finding suggests that SGLang may be optimized for single-GPU performance, and its current implementation might not efficiently distribute work across multiple GPUs.  Refer to the test result [here](./TwoA10-test-result-samples.md)
 
-4. To futher comfirm this unexpected scaling behavior for SGLang, I then tested SGLang on 4 A10 GPUs and got the same result.
+4. To futher comfirm this unexpected scaling behavior for SGLang, I then tested SGLang (vllm as well) on 4 A10 GPUs and got the same result.
 
 ## Single-GPU Results
 
@@ -254,9 +254,9 @@ Test completed in 60.97 seconds
 └────────────────────────────┴─────────────────────────────────┘
 ```
 
-**For 2 A10 GPU, SGLang showed significantly higher response time variance and less predictable throughput.** At the first it is hard to believe this, so I test many times to confirmed that. I then tested on **4 A10** GPU, SGLang still showed this strange behavious. Refer to the complete result [here](./4A10.md)
+**For 2 A10 GPU, SGLang showed significantly higher response time variance and less predictable throughput.** At the first it was hard to believe it, so I tested many times to confirmed that. I then tested on **4 A10** GPU, SGLang still showed this strange behavious. Refer to the complete result [here](./4A10.md)
 
-For 2 A10 GPU, vLLM indeed showed a slightly better result for 1 A10 GPU (same 4 A10).
+For 2 A10 GPU (and 4 A10 GPU), vLLM indeed showed a slightly better result for 1 A10 GPU.
 
 
 #### vLLM with 30 Concurrent Requests (300 total) on 2 A10
@@ -354,13 +354,13 @@ This initially led me to believe that SGLang had extraordinary memory efficiency
 When launching SGLang, I used:
 
 ```
-python3 -m sglang.launch_server --model-path /home/vllm/llm/Qwen7B-awq/ --max-total-tokens 8192
+python3 -m sglang.launch_server --model-path /home/vllm/llm/Qwen7B-awq --max-total-tokens 8192
 ```
 
 While for vLLM, I used:
 
 ```
-vllm serve qwen7B-awq --port 8000 --max-model-len 8192
+vllm serve /home/vllm/llm/Qwen7B-awq --max-model-len 8192
 ```
 
 The key insight: `--max-total-tokens` in SGLang is **not** equivalent to `--max-model-len` in vLLM. The proper equivalent parameter is `--context-length`.
