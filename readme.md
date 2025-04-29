@@ -74,9 +74,11 @@ The comparative analysis revealed important nuances about configuration impacts,
 
 2. **In multi-GPU scenarios**: vLLM maintained consistent performance while SGLang showed significant variability and decreased throughput when using the `--dp` (**data parallelism**) flag.
 
-3. **Unexpected parallelism impact**: When switching SGLang from data parallelism (`--dp`) to **tensor parallelism** (`--tp`), performance dramatically improved on multi-GPU setups, restoring the consistency and throughput advantages seen in single-GPU scenarios. This parallelism strategy choice had a much larger impact on performance characteristics than expected.
+3. **Unexpected parallelism impact**: When switching SGLang from data parallelism (`--dp`) to **tensor parallelism** (`--tp`), performance dramatically improved on multi-GPU setups, restoring **the consistency and throughput advantages** seen in single-GPU scenarios. This parallelism strategy choice had a much larger impact on performance characteristics than expected.
 
-4. **Unanswered question**: Why does tensor parallelism in SGLang provide such dramatically better performance consistency than data parallelism for a model that easily fits on a single GPU? This counter-intuitive finding invites further investigation from the community. [The SGLang document](https://docs.sglang.ai/backend/server_arguments.html) may provide some clues,"Data parallelism is better for throughput if there is enough memory. It can also be used together with tensor parallelism. We recommend [SGLang Router](https://docs.sglang.ai/router/router.html) for data parallelism."
+4. **Warm-up differences**: SGLang showed a significant "warm-up effect" requiring initial requests to reach optimal performance, while vLLM delivered consistent performance from the first request without warm-up.
+
+5. **Unanswered question**: Why does tensor parallelism in SGLang provide such dramatically better performance consistency than data parallelism for a model that easily fits on a single GPU? This counter-intuitive finding invites further investigation from the community. [The SGLang document](https://docs.sglang.ai/backend/server_arguments.html) may provide some clues,"Data parallelism is better for throughput if there is enough memory. It can also be used together with tensor parallelism. We recommend [SGLang Router](https://docs.sglang.ai/router/router.html) for data parallelism."
 
    
 
@@ -404,11 +406,7 @@ Test completed in 29.73 seconds
 └────────────────────────────┴──────────────────────────────────────┘
 ```
 
-
-
-For 4 A10 GPU setting, SGLang with --tp 4 show even better performance compared to 2 A10, Refer to the complete result [here](./4A10.md), while vLLM's improvements is minor maybe due to 50 concurrent request at most.
-
-### Multi-GPU Comparison with Corrected Parallelism Strategy (30 concurrent requests)
+### 2-GPU Comparison with Corrected Parallelism Strategy (30 concurrent requests)
 
 | Metric                | SGLang (DP)     | SGLang (TP)       | vLLM        |
 | --------------------- | --------------- | ----------------- | ----------- |
@@ -427,7 +425,20 @@ What's particularly impressive is that SGLang with tensor parallelism (although 
 
 These results confirm that the parallelism strategy is crucial for multi-GPU deployments of SGLang, with tensor parallelism providing both better consistency and higher throughput than data parallelism, despite conventional wisdom suggesting data parallelism would be better for throughput with smaller models.
 
-## The `--max-total-tokens` misunderstanding
+### 4 A10 GPU results
+
+SGLang with tensor parallelism shows more dramatic scaling improvements when moving from 2 to 4 GPUs:
+
+- For 30 concurrent requests: 10.78 req/s → 20.27 req/s (88% improvement)
+- For 50 concurrent requests: 17.52 req/s → 24.48 req/s (40% improvement)
+
+vLLM Performance comparison between 2 A10 and 4 A10 GPUs does show some scaling improvements  but the gains are modest.
+
+Refer to the complete result [here](./4A10.md#4.29)
+
+## parameter equivalence discovery
+
+Except for `dp` & `tp` (vllm has `--tensor-parallel-size` but seem no `dp` conterpart) flag confusion, I also had  `--max-total-tokens` misunderstanding, I had thought that was the `--max-model-length` of SGLang.
 
 Early in the testing process, I encountered what appeared to be a dramatic difference in memory usage between the two frameworks:
 
@@ -577,23 +588,33 @@ This testing aims to provide a reasonable comparison under specific conditions, 
 
 ## Conclusion
 
-The performance comparison between SGLang and vLLM yielded surprising and nuanced results that highlight important considerations for LLM deployment:
+### Short Version
 
-### Critical Configuration Discoveries
+Beware of the initial warm-up phase and a potentially steeper learning curve; however, for maximizing sustained performance, our benchmarks indicate SGLang is generally the more advantageous choice over vLLM once appropriately configured and warmed up.
 
-1. **Parallelism strategy matters enormously**: For SGLang, using tensor parallelism (`--tp`) instead of data parallelism (`--dp`) in multi-GPU setups dramatically improved performance, changing it from significantly worse than vLLM to significantly better.
-2. **Parameter equivalence is critical**: Proper configuration of equivalent parameters across frameworks (`--max-model-len` in vLLM vs. `--context-length` in SGLang) is essential for fair comparisons and optimal resource utilization.
+### Long Version
 
-### Performance Characteristics
+The performance comparison between SGLang and vLLM yielded nuanced results that highlight important considerations for LLM deployment beyond simple throughput numbers. 
+
+Key takeaways include:
+
+#### Performance Characteristics
 
 1. **SGLang excelled with tensor parallelism**: Showed extremely consistent response times and excellent throughput in both single and multi-GPU configurations when properly configured with `--tp`.
 
 2. **Configuration dramatically impacted performance**: SGLang with data parallelism performed significantly worse than with tensor parallelism, highlighting how critical parallelism strategy choice is.
 3. **Warm-up differences**: SGLang showed a significant "warm-up effect" requiring initial requests to reach optimal performance, while vLLM delivered consistent performance from the first request without warm-up.
 
-3. **vLLM provided lower minimum latency**: While not matching SGLang's consistency with tensor parallelism, vLLM consistently delivered lower minimum response times across all test scenarios.
+4. **vLLM provided lower minimum latency**: While not matching SGLang's consistency with tensor parallelism, vLLM consistently delivered lower minimum response times across all test scenarios.
 
-### Key Takeaways for Deployment
+5. **Scaling efficiency differences**: SGLang with tensor parallelism showed substantially better scaling when moving from 2 to 4 GPUs (up to 88% throughput improvement) compared to vLLM (only 15-20% improvement in most scenarios). This suggests SGLang may have better scaling characteristics for deployments with higher GPU counts.
+
+#### Critical Configuration Discoveries
+
+1. **Parallelism strategy matters enormously**: For SGLang, using tensor parallelism (`--tp`) instead of data parallelism (`--dp`) in multi-GPU setups dramatically improved performance, changing it from significantly worse than vLLM to significantly better.
+2. **Parameter equivalence is critical**: Proper configuration of equivalent parameters across frameworks (`--max-model-len` in vLLM vs. `--context-length` in SGLang) is essential for fair comparisons and optimal resource utilization.
+
+#### Key Takeaways for Deployment
 
 These findings suggest that:
 
