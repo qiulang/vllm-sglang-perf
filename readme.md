@@ -21,13 +21,13 @@
 
 SGLang and vLLM are both high-performance inference frameworks for large language models, with SGLang taking a compilation-based approach while vLLM focuses on optimized attention and memory management.
 
-Before starting this comparison, I had no bias toward either framework and was simply curious about their relative performance. The comparative analysis revealed important nuances about configuration impacts, with each framework exhibiting specific performance advantages in different deployment scenarios depending on parallelism strategies and parameter settings.
-
-Benchmark testing without clear objectives can often be misleading and produce non-objective results. However, this project has a specific, focused goal: to evaluate how vLLM and SGLang perform when running a small LLM model on a **mid-range** NVIDIA GPU like A10, in both single and multi-GPU configurations.
+Before starting this comparison, I had no bias toward either framework and was simply curious about their relative performance. I understand benchmark testing without clear objectives can often be misleading and produce non-objective results. However, this project has a specific, focused goal: to evaluate how vLLM and SGLang perform when running a small LLM model on a **mid-range** NVIDIA GPU like A10, in both single and multi-GPU configurations.
 
 For this test, I selected the Qwen 2.5 7B quantized model. I specifically chose its AWQ variant rather than the GPTQ int 4-bit model, based on both information from sources like https://github.com/mit-han-lab/llm-awq and my own testing, which showed AWQ outperforming GPTQ int 4-bit models.
 
 This represents a practical, real-world scenario for organizations deploying smaller quantized models on accessible hardware, rather than focusing on high-end multi-GPU setups that may be less common in production environments.
+
+The comparative analysis revealed important nuances about configuration impacts, with each framework exhibiting specific performance advantages in different deployment scenarios depending on parallelism strategies and parameter settings.
 
 ## Test Setup
 
@@ -51,7 +51,7 @@ This represents a practical, real-world scenario for organizations deploying sma
 
 1. Setup:
    - Started with a clean Ubuntu 22 machine with only CUDA & Conda environments installed
-   - No other GPU processes running during tests as nvidia-smi shows zero usage.
+   - No other GPU processes running during tests as nvidia-smi shows.
 
 2. First SGLang testing:
    - Start the SGLang server, `python3 -m sglang.launch_server --model-path $MODEL_PATH --context-length 8192 --tp 1|2|4`
@@ -70,11 +70,11 @@ This represents a practical, real-world scenario for organizations deploying sma
 
 1. **In single-GPU scenarios**: SGLang demonstrated extremely consistent response times, higher throughput, and comparable memory usage when properly configured.
 
-2. **In multi-GPU scenarios with data parallelism**: vLLM maintained consistent performance while SGLang showed significant variability and decreased throughput when using the `--dp` (data parallelism) flag.
+2. **In multi-GPU scenarios**: vLLM maintained consistent performance while SGLang showed significant variability and decreased throughput when using the `--dp` (**data parallelism**) flag.
 
-3. **Unexpected parallelism impact**: When switching SGLang from data parallelism (`--dp`) to tensor parallelism (`--tp`), performance dramatically improved on multi-GPU setups, restoring the consistency and throughput advantages seen in single-GPU scenarios. This parallelism strategy choice had a much larger impact on performance characteristics than expected.
+3. **Unexpected parallelism impact**: When switching SGLang from data parallelism (`--dp`) to **tensor parallelism** (`--tp`), performance dramatically improved on multi-GPU setups, restoring the consistency and throughput advantages seen in single-GPU scenarios. This parallelism strategy choice had a much larger impact on performance characteristics than expected.
 
-4. **Unanswered question**: Why does tensor parallelism in SGLang provide such dramatically better performance consistency than data parallelism for a model that easily fits on a single GPU? This counter-intuitive finding invites further investigation from the community.
+4. **Unanswered question**: Why does tensor parallelism in SGLang provide such dramatically better performance consistency than data parallelism for a model that easily fits on a single GPU? This counter-intuitive finding invites further investigation from the community. [The SGLang document](https://docs.sglang.ai/backend/server_arguments.html) may provide some clues,"Data parallelism is better for throughput if there is enough memory. It can also be used together with tensor parallelism. We recommend [SGLang Router](https://docs.sglang.ai/router/router.html) for data parallelism."
 
    
 
@@ -188,9 +188,9 @@ For SGLang, the choice between data parallelism (DP) and tensor parallelism (TP)
 
 ### The Parallelism Strategy Discovery
 
-During this testing, a critical discovery was made regarding SGLang's multi-GPU performance. Initially, SGLang was configured with the `--dp` flag (data parallelism) for multi-GPU tests, based on my assumption that data parallelism is better for throughput when there's enough memory, refer to https://docs.sglang.ai/backend/server_arguments.html. The Qwen 7B model easily fits on a single A10 GPU's 24GB memory, so this seemed like the right choice.
+Initially, SGLang was configured with the `--dp` flag (data parallelism) for multi-GPU tests, based on my assumption that data parallelism is better for throughput when there's enough memory, refer to https://docs.sglang.ai/backend/server_arguments.html. The Qwen 7B model easily fits on a single A10 GPU's 24GB memory, so this seemed like the right choice.
 
-However, after observing surprisingly poor performance with data parallelism, I got the feedback from https://github.com/sgl-project/sglang/issues/5808 I realize I should use `tp` flag instead.
+However, after observing surprisingly poor performance with data parallelism, I got the feedback from https://github.com/sgl-project/sglang/issues/5808 that I should use `tp` flag instead.
 
 This resulted in dramatically improved performance, with consistency and throughput comparable to or better than the single-GPU results.
 
@@ -199,7 +199,7 @@ This resulted in dramatically improved performance, with consistency and through
 1. **Data Parallelism (`--dp`)**: When using this approach, each GPU gets a complete copy of the model and handles separate batches independently. While this increases theoretical throughput capacity, it led to highly variable response times and less efficient request processing in practice.
 2. **Tensor Parallelism (`--tp`)**: With this approach, a single model is split across multiple GPUs, with each GPU handling a portion of the model's computation. For our Qwen 7B model, this provided much more consistent response times and better overall throughput.
 
-This finding challenges conventional wisdom about when to use tensor vs. data parallelism. While tensor parallelism is often recommended primarily for models too large to fit on a single GPU, our testing demonstrates it can also be superior for smaller models when consistent response times and efficient multi-GPU scaling are priorities.
+This finding challenges my idea about when to use tensor vs. data parallelism. While tensor parallelism is often recommended primarily for models too large to fit on a single GPU, our testing demonstrates it can also be superior for smaller models when consistent response times and efficient multi-GPU scaling are priorities.
 
 ### SGLang with Data Parallelism
 
@@ -406,8 +406,6 @@ Test completed in 29.73 seconds
 
 For 4 A10 GPU setting, SGLang with --tp 4 show even better performance compared to 2 A10, Refer to the complete result [here](./4A10.md), while vLLM's improvements is minor maybe due to 50 concurrent request at most.
 
-
-
 ### Multi-GPU Comparison with Corrected Parallelism Strategy (30 concurrent requests)
 
 | Metric                | SGLang (DP)     | SGLang (TP)       | vLLM        |
@@ -419,7 +417,7 @@ For 4 A10 GPU setting, SGLang with --tp 4 show even better performance compared 
 | Actual Throughput     | 4.92-8.13 req/s | 11.12-11.14 req/s | 10.82 req/s |
 | Tokens Per Second     | 511-853         | 1151-1158         | 1074        |
 
-What's particularly impressive is that SGLang with tensor parallelism:
+What's particularly impressive is that SGLang with tensor parallelism (although vllm has better min reponse times):
 
 1. Shows almost perfect consistency (response times within a 0.02s range in the latest run)
 2. Maintains slightly better throughput than vLLM (11.14 req/s vs 10.82 req/s)
@@ -427,7 +425,7 @@ What's particularly impressive is that SGLang with tensor parallelism:
 
 These results confirm that the parallelism strategy is crucial for multi-GPU deployments of SGLang, with tensor parallelism providing both better consistency and higher throughput than data parallelism, despite conventional wisdom suggesting data parallelism would be better for throughput with smaller models.
 
-## The `--max-total-tokens` Misunderstanding
+## The `--max-total-tokens` misunderstanding
 
 Early in the testing process, I encountered what appeared to be a dramatic difference in memory usage between the two frameworks:
 
@@ -473,21 +471,23 @@ Using tensor parallelism (`--tp`) instead of data parallelism (`--dp`) in multi-
 2. **High token generation speed** - 333 tokens per second for low concurrency and up to 1544 tokens per second at higher concurrency
 3. **Very low latency** - Average response times of 1.51 seconds for generating ~100 tokens per request
 4. **Efficient batch processing** - Effective handling of concurrent requests in a single GPU
+5. **Warm-up Effect** - The first run has more variable response times, after warm-up, consistency improves dramatically. Check the next section for detailed analysis.
 
 ### vLLM Performance Analysis
 
-vLLM showed different strengths depending on the deployment configuration:
+vLLM shows a few distinguishing characteristics compared to SGLang in our testing:
 
-In single-GPU setups:
-1. **Good but not exceptional response times** - Average of 1.64-2.57 seconds
-2. **Moderate consistency** - Standard deviation of 0.20-0.30 seconds
-3. **Solid throughput** - 2.65-9.50 requests per second depending on concurrency
+In both single and multi-GPU setups:
 
-vLLM truly shined in multi-GPU setups:
-1. **Consistent response times** - Maintained low standard deviation (0.27-0.28 seconds)
-2. **Predictable latency range** - Tight band between min and max response times
-3. **Higher throughput** - Outperformed SGLang in actual requests per second
-4. **Stable performance** - Consistent results across multiple test runs
+1. **No Warm-up needed**: SGLang showed a significant "warm-up effect" requiring initial requests to reach optimal performance, while vLLM delivered consistent performance from the first request without warm-up.
+2. **Lower minimum response time** - Consistently showed lower minimum response times (0.78-1.36s) compared to SGLang's minimum times (1.51-2.68s)
+3. **More mature ecosystem** - As a more established project with a longer history, vLLM likely offers greater stability and a broader range of deployment options
+4. **Higher variability** - Standard deviation of 0.14-0.28s compared to SGLang TP's extremely tight 0.01-0.03s
+5. **Potentially unexplored optimizations** - Our tests used default configurations, and vLLM may benefit from further fine-tuning of parameters for this specific workload
+
+It's worth noting that vLLM is widely adopted in production environments and has undergone extensive real-world testing across various deployment scenarios. While our specific test configuration showed SGLang with tensor parallelism outperforming vLLM in consistency and throughput, vLLM's maturity and active development may offer advantages not captured in these benchmarks.
+
+This performance analysis represents a snapshot of current capabilities with our specific hardware, model, and configuration choices.
 
 ## Warm-up Effect
 
@@ -584,21 +584,12 @@ The performance comparison between SGLang and vLLM yielded surprising and nuance
 
 ### Performance Characteristics
 
-1. SGLang with tensor parallelism excelled in both configurations:
+1. **SGLang excelled with tensor parallelism**: Showed extremely consistent response times and excellent throughput in both single and multi-GPU configurations when properly configured with `--tp`.
 
-   - Single GPU: Extremely consistent response times (std dev of just 0.01s)
-   - Multiple GPUs with TP: Maintained excellent consistency (std dev of 0.06s) with increased throughput
-   
-2. SGLang with data parallelism performed poorly in multi-GPU tests:
+2. **Configuration dramatically impacted performance**: SGLang with data parallelism performed significantly worse than with tensor parallelism, highlighting how critical parallelism strategy choice is.
+3. **Warm-up differences**: SGLang showed a significant "warm-up effect" requiring initial requests to reach optimal performance, while vLLM delivered consistent performance from the first request without warm-up.
 
-   - High variability (std dev up to 2.37s)
-   - Wide response time range (up to 12.37s)
-   - Lower throughput than both vLLM and tensor-parallel SGLang
-   
-3. vLLM showed good consistency across configurations:
-
-   - Single GPU: Good performance with moderate consistency
-- Multiple GPUs: Maintained consistent performance with improved throughput
+3. **vLLM provided lower minimum latency**: While not matching SGLang's consistency with tensor parallelism, vLLM consistently delivered lower minimum response times across all test scenarios.
 
 ### Key Takeaways for Deployment
 
