@@ -21,7 +21,9 @@
 
 SGLang and vLLM are both high-performance inference frameworks for large language models, with SGLang taking a compilation-based approach while vLLM focuses on optimized attention and memory management.
 
-Before starting this comparison, I had no bias toward either framework and was simply curious about their relative performance. I understand benchmark testing without clear objectives can often be misleading and produce non-objective results. However, this project has a specific, focused goal: to evaluate how vLLM and SGLang perform when running a small LLM model on a **mid-range** NVIDIA GPU like A10, in both single and multi-GPU configurations.
+Before starting this comparison, I had no bias toward either framework and was simply curious about their relative performance. I understand benchmark testing without clear objectives can often be misleading and produce non-objective results. However, this project has a specific, focused goal: to evaluate how vLLM and SGLang perform when running a small LLM model on a **mid-range** NVIDIA GPU like **A10**, in both single and multi-GPU configurations.
+
+It's worth noting that official benchmarks from vLLM against SGLang exist (https://blog.vllm.ai/2024/09/05/perf-update.html), but these were conducted in September 2024 on high-end A100 and H100 GPUs. Our testing on mid-range A10 GPUs in April 2025 reflects different hardware profiles and more recent versions of both frameworks. The LLM inference landscape evolves rapidly, with both frameworks receiving regular updates that can significantly change performance characteristics. This highlights the importance of testing with your specific hardware, models, and the latest framework versions rather than relying solely on existing benchmarks.
 
 For this test, I selected the Qwen 2.5 7B quantized model. I specifically chose its AWQ variant rather than the GPTQ int 4-bit model, based on both information from sources like https://github.com/mit-han-lab/llm-awq and my own testing, which showed AWQ outperforming GPTQ int 4-bit models.
 
