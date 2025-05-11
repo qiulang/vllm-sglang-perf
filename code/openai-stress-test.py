@@ -20,6 +20,7 @@ import time
 import statistics
 import sys
 import os
+import random
 from datetime import datetime
 from openai import AsyncOpenAI
 from rich.console import Console
@@ -30,20 +31,33 @@ from rich.progress import Progress, TaskID
 DEFAULT_API_BASE = "http://localhost:9997/v1"
 DEFAULT_API_KEY = "not-needed"  # Many local servers don't require API keys
 DEFAULT_MODEL = "qwen2.5-instruct"
-DEFAULT_PROMPT = "Explain what makes a good API in one paragraph."
 DEFAULT_CONCURRENT = 30
 DEFAULT_TOTAL = 300
 DEFAULT_TIMEOUT = 120  # 2 minutes timeout
 DEFAULT_MAX_TOKENS = 256
 DEFAULT_TEMPERATURE = 0.7
+# List of diverse prompts to prevent caching
+PROMPT_LIST = [
+    "Explain what makes a good API in one paragraph.",
+    "What are three key considerations when designing a distributed system?",
+    "Write a short poem about artificial intelligence.",
+    "Describe the concept of technical debt to a non-technical person.",
+    "What are the main differences between SQL and NoSQL databases?",
+    "Explain the CAP theorem in simple terms.",
+    "What are some best practices for securing a web application?",
+    "Describe how virtualization works in cloud computing.",
+    "What is the difference between supervised and unsupervised machine learning?",
+    "Explain how public key cryptography works in simple terms."
+]
 
 console = Console()
 
 
-async def send_request(client, model, prompt, request_id, progress_bar, task_id,
+async def send_request(client, model, request_id, progress_bar, task_id,
                        max_tokens=DEFAULT_MAX_TOKENS, temperature=DEFAULT_TEMPERATURE):
     """Send a single request to the LLM server and measure the response time."""
     start_time = time.time()
+    prompt = random.choice(PROMPT_LIST)
 
     try:
         # Using ChatCompletions API which is more widely supported
@@ -98,7 +112,7 @@ async def send_request(client, model, prompt, request_id, progress_bar, task_id,
         }
 
 
-async def run_stress_test(api_base, api_key, model, prompt, concurrent_requests, total_requests,
+async def run_stress_test(api_base, api_key, model, concurrent_requests, total_requests,
                           max_tokens=DEFAULT_MAX_TOKENS, temperature=DEFAULT_TEMPERATURE):
     """Run the stress test with the specified parameters."""
     results = []
@@ -118,7 +132,7 @@ async def run_stress_test(api_base, api_key, model, prompt, concurrent_requests,
         tasks = []
         for i in range(total_requests):
             tasks.append(send_request(
-                client, model, prompt, i+1, progress, task_id,
+                client, model, i+1, progress, task_id,
                 max_tokens=max_tokens, temperature=temperature
             ))
 
@@ -286,8 +300,6 @@ def main():
                         help="API key (default: not-needed)")
     parser.add_argument("--model", default=os.getenv("LLM_MODEL", DEFAULT_MODEL),
                         help=f"Model to use (default: {DEFAULT_MODEL})")
-    parser.add_argument("--prompt", default=DEFAULT_PROMPT,
-                        help="Prompt to send (default is a short explanation request)")
     parser.add_argument("--concurrent", type=int, default=DEFAULT_CONCURRENT,
                         help=f"Number of concurrent requests (default: {DEFAULT_CONCURRENT})")
     parser.add_argument("--total", type=int, default=DEFAULT_TOTAL,
@@ -306,8 +318,6 @@ def main():
     console.print(f"Temperature: {args.temperature}")
     console.print(f"Concurrent requests: {args.concurrent}")
     console.print(f"Total requests: {args.total}")
-    console.print(
-        f"Prompt: '{args.prompt[:50]}...' ({len(args.prompt)} chars)")
 
     start_time = time.time()
 
@@ -316,7 +326,6 @@ def main():
             args.api_base,
             args.api_key,
             args.model,
-            args.prompt,
             args.concurrent,
             args.total,
             args.max_tokens,

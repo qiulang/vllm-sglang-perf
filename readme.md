@@ -45,7 +45,7 @@ The comparative analysis revealed important nuances about configuration impacts,
 - Model: [Qwen2.5 7B-AWQ (quantized)](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-AWQ)
 
 ### Test Parameters
-- Requests: 20 (small test) and 300 (larger test)
+- Requests: 20 (small test) and 300 (larger test), single-round inference
 - Concurrency: 5 and 30 concurrent requests
 - Identical prompts with max_tokens=256
 
@@ -533,11 +533,12 @@ For production deployments, this suggests:
 ### Potential Limitations
 
 1. **Test duration**: Short tests may not capture long-running behavior or memory leaks
-2. **Prompt diversity**: Using similar/identical prompts might not represent varied real-world workloads
-3. **Configuration optimization**: Each framework might benefit from different configuration parameters
-4. **Output token variability**: If the number of generated tokens varies between tests, it can affect timing
-5. **Limited model architectures**: Results might vary with different model architectures or sizes
-6. **Lack of error handling testing**: How systems perform under error conditions wasn't evaluated
+2. **Multi-turn conversations**: the tests only do single-turn conversation while SGLang's RadixAttention is said to be excel at multi-turn conversations.
+3. **Prompt diversity**: Using similar/identical prompts might not represent varied real-world workloads
+4. **Configuration optimization**: Each framework might benefit from different configuration parameters
+5. **Output token variability**: If the number of generated tokens varies between tests, it can affect timing
+6. **Limited model architectures**: Results might vary with different model architectures or sizes
+7. **Lack of error handling testing**: How systems perform under error conditions wasn't evaluated
 
 ### Suggestions for More Comprehensive Testing
 

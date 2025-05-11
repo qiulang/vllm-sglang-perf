@@ -13,6 +13,7 @@ import json
 import time
 import statistics
 import sys
+import random
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
@@ -21,20 +22,34 @@ from rich.progress import Progress, TaskID
 # Default values
 DEFAULT_URL = "http://localhost:8000/v1/completions"
 DEFAULT_MODEL = "/home/vllm/llm/Qwen7B-awq"
-DEFAULT_PROMPT = "Explain what makes a good API in one paragraph."
 DEFAULT_CONCURRENT = 30
 DEFAULT_TOTAL = 300
 DEFAULT_TIMEOUT = 120  # 2 minutes timeout
 DEFAULT_MAX_TOKENS = 256
 DEFAULT_TEMPERATURE = 0.7
+# List of diverse prompts to prevent caching
+PROMPT_LIST = [
+    "Explain what makes a good API in one paragraph.",
+    "What are three key considerations when designing a distributed system?",
+    "Write a short poem about artificial intelligence.",
+    "Describe the concept of technical debt to a non-technical person.",
+    "What are the main differences between SQL and NoSQL databases?",
+    "Explain the CAP theorem in simple terms.",
+    "What are some best practices for securing a web application?",
+    "Describe how virtualization works in cloud computing.",
+    "What is the difference between supervised and unsupervised machine learning?",
+    "Explain how public key cryptography works in simple terms."
+]
 
 console = Console()
 
 
-async def send_request(session, url, model, prompt, request_id, progress_bar, task_id,
+async def send_request(session, url, model, request_id, progress_bar, task_id,
                        max_tokens=DEFAULT_MAX_TOKENS, temperature=DEFAULT_TEMPERATURE):
     """Send a single request to vLLM and measure the response time."""
     start_time = time.time()
+    # Randomly select a prompt from the list
+    prompt = random.choice(PROMPT_LIST)
 
     # Format for vLLM API
     data = {
@@ -101,7 +116,7 @@ async def send_request(session, url, model, prompt, request_id, progress_bar, ta
         }
 
 
-async def run_stress_test(url, model, prompt, concurrent_requests, total_requests,
+async def run_stress_test(url, model, concurrent_requests, total_requests,
                           max_tokens=DEFAULT_MAX_TOKENS, temperature=DEFAULT_TEMPERATURE):
     """Run the stress test with the specified parameters."""
     results = []
@@ -118,7 +133,7 @@ async def run_stress_test(url, model, prompt, concurrent_requests, total_request
             tasks = []
             for i in range(total_requests):
                 tasks.append(send_request(
-                    session, url, model, prompt, i+1, progress, task_id,
+                    session, url, model, i+1, progress, task_id,
                     max_tokens=max_tokens, temperature=temperature
                 ))
 
@@ -274,8 +289,6 @@ def main():
                         help=f"vLLM API URL (default: {DEFAULT_URL})")
     parser.add_argument("--model", default=DEFAULT_MODEL,
                         help=f"Model to use (default: {DEFAULT_MODEL})")
-    parser.add_argument("--prompt", default=DEFAULT_PROMPT,
-                        help="Prompt to send (default is a short explanation request)")
     parser.add_argument("--concurrent", type=int, default=DEFAULT_CONCURRENT,
                         help=f"Number of concurrent requests (default: {DEFAULT_CONCURRENT})")
     parser.add_argument("--total", type=int, default=DEFAULT_TOTAL,
@@ -294,8 +307,6 @@ def main():
     console.print(f"Temperature: {args.temperature}")
     console.print(f"Concurrent requests: {args.concurrent}")
     console.print(f"Total requests: {args.total}")
-    console.print(
-        f"Prompt: '{args.prompt[:50]}...' ({len(args.prompt)} chars)")
 
     start_time = time.time()
 
@@ -303,7 +314,6 @@ def main():
         results, test_info = asyncio.run(run_stress_test(
             args.url,
             args.model,
-            args.prompt,
             args.concurrent,
             args.total,
             args.max_tokens,
