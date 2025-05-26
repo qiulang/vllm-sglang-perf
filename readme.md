@@ -21,13 +21,13 @@
 
 ## Introduction
 
-SGLang and vLLM are both high-performance inference frameworks for large language models, with SGLang taking a compilation-based approach while vLLM focuses on optimized attention and memory management.
+[SGLang](https://github.com/sgl-project/sglang) and [vLLM](https://github.com/vllm-project/vllm) are both high-performance inference frameworks for large language models, with SGLang taking a compilation-based approach while vLLM focuses on optimized attention and memory management.
 
 Before starting this comparison, I had no bias toward either framework and was simply curious about their relative performance. I understand benchmark testing without clear objectives can often be misleading and produce non-objective results. However, this project has a specific, focused goal: to evaluate how vLLM and SGLang perform when running a small LLM model on a **mid-range** NVIDIA GPU like **A10**, in both single and multi-GPU configurations.
 
 It's worth noting that official benchmarks from vLLM against SGLang exist (https://blog.vllm.ai/2024/09/05/perf-update.html), but these were conducted in September 2024 on high-end A100 and H100 GPUs. Our testing on mid-range A10 GPUs in April 2025 reflects different hardware profiles and more recent versions of both frameworks. The LLM inference landscape evolves rapidly, with both frameworks receiving regular updates that can significantly change performance characteristics. This highlights the importance of testing with your specific hardware, models, and the latest framework versions rather than relying solely on existing benchmarks.
 
-For this test, I selected the Qwen 2.5 7B quantized model. I specifically chose its AWQ variant rather than the GPTQ int 4-bit model, based on both information from sources like https://github.com/mit-han-lab/llm-awq and my own testing, which showed AWQ outperforming GPTQ int 4-bit models.
+For this test, I selected the [Qwen 2.5 7B quantized model](https://modelscope.cn/models/Qwen/Qwen2.5-7B-Instruct-AWQ/). I specifically chose its AWQ variant rather than the GPTQ int 4-bit model, based on both information from sources like https://github.com/mit-han-lab/llm-awq and my own testing, which showed AWQ outperforming GPTQ int 4-bit models.
 
 This represents a practical, real-world scenario for organizations deploying smaller quantized models on accessible hardware, rather than focusing on high-end multi-GPU setups that may be less common in production environments.
 
@@ -35,9 +35,13 @@ The comparative analysis revealed important nuances about configuration impacts,
 
 ### Qwen3 upate
 
-As [Qwen3](https://qwenlm.github.io/blog/qwen3/) Quantization model was released since May 2025, I chose [Qwen 3-4B awq](https://modelscope.cn/models/Qwen/Qwen3-4B-AWQ) to do the performance test again (same hardware configuration as original tests). To my surprise, my test result somwhat overturned my conclusion for Qwen 2.5-7B. For Qwen2.5-7B SGLang is clearly the winner by showing extremely consistent response times and excellent throughput if we notice the initial warm-up phase and a potentially steeper learning curve. But for Qwen 3, vllm is the winner with consistent response times and better throughput. Please check the Appendix for detailed information.
+Following the release of [Qwen3](https://qwenlm.github.io/blog/qwen3/) quantization models in May 2025, I conducted additional performance testing using [Qwen3-4B AWQ](https://modelscope.cn/models/Qwen/Qwen3-4B-AWQ) with the same hardware configuration as the original tests.
 
-BTW,  Qwen [official document](https://qwen.readthedocs.io/en/latest/deployment/vllm.html) indeed says, ""We recommend you trying [vLLM](https://github.com/vllm-project/vllm) for your deployment of Qwen."
+The results significantly challenged my initial conclusions from the Qwen2.5-7B testing. While SGLang demonstrated clear advantages for Qwen2.5-7B through extremely consistent response times and excellent throughput (accounting for the initial warm-up phase and steeper learning curve), **vLLM emerged as the superior choice for Qwen3-4B** with better consistency, throughput, and overall performance characteristics.
+
+This finding aligns with Qwen's official deployment recommendations. Their [documentation](https://qwen.readthedocs.io/en/latest/deployment/vllm.html) explicitly states: *"We recommend you trying [vLLM](https://github.com/vllm-project/vllm) for your deployment of Qwen,"* while SGLang receives only [a brief mention](https://qwen.readthedocs.io/en/latest/deployment/sglang.html) as *"a fast serving framework for large language models and vision language models."*
+
+However, reaching this conclusion required extensive testing and multiple iterations to uncover critical methodological issues, including fundamental differences in parameter handling between frameworks. The detailed analysis in the Appendix reveals why initial performance comparisons were misleading and provides crucial insights for accurate framework evaluation.
 
 ## Test Setup
 
@@ -595,15 +599,15 @@ Performance testing can be insightful but is rarely definitive. Before reviewing
 
 This testing aims to provide a reasonable comparison under specific conditions, not a definitive judgment on which framework is "better" in all cases.
 
-## Conclusion
+## ~~Conclusion~~
 
 Please check appendix section for the overall conclusion.
 
-### ~~Short Version~~
+### Short Version
 
 Beware of the initial warm-up phase and a potentially steeper learning curve; however, for maximizing sustained performance, our benchmarks indicate SGLang is generally the more advantageous choice over vLLM once appropriately configured and warmed up.
 
-### ~~Long Version~~
+### Long Version
 
 The performance comparison between SGLang and vLLM yielded nuanced results that highlight important considerations for LLM deployment beyond simple throughput numbers. 
 
@@ -648,111 +652,71 @@ I encourage users to run their own tests with workloads representative of their 
 - **SGLang** `python -m sglang.launch_server --model-path Qwen/Qwen3-4B`
 - **vLLM**: `vllm serve Qwen/Qwen3-4B` 
 
-Testing with Qwen3-4B revealed two critical insights that significantly impact framework selection: **performance advantages are highly model-dependent**, and **API interface choice can be more impactful than the underlying framework optimizations**. While SGLang demonstrated superior performance with Qwen2.5-7B, vLLM emerged as the clear winner for Qwen3-4B, particularly when using OpenAI-compatible APIs that most production deployments require.
+In my initial test, both SGLang and vLLM showed excellent consistent response times for both native api and OpenAI-compatible APIs. 
 
-### Dual API Testing Methodology
-
-The testing was conducted using both:
 1. **Native APIs**: SGLang's `/generate` endpoint vs vLLM's `/v1/completions`
 2. **OpenAI-compatible APIs**: Both frameworks' `/v1` endpoints for direct comparison
 
-### Qwen3-4B Performance Results
+What was even more confusing was that **turning on** think mode would get better response times. Then I figured out why! I had set `max_tokens` to 256, so almost all responses were truncated with `finish_reason='length'`. For think mode, since the response contains `"<think>..."` formatting, it reached the 256 token limit faster, resulting in even more consistent (but artificially shortened) responses.
 
-#### Native API Performance (10 concurrent, 100 requests)
+For completest test result for `max_tokens=256`, please refer to [here](./qwen3-256.md)
 
-| Metric                    | SGLang Native  | vLLM Native   | Winner     |
-| ------------------------- | -------------- | ------------- | ---------- |
-| **Average Response Time** | **2.29s**      | 2.65s         | **SGLang** |
-| **Standard Deviation**    | **0.01s**      | 0.01s         | **Tie**    |
-| **Actual Throughput**     | **4.37 req/s** | 3.77 req/s    | **SGLang** |
-| **Tokens Per Second**     | 447 tok/s      | **773 tok/s** | **vLLM**   |
-| **Test Duration**         | **22.88s**     | 26.54s        | **SGLang** |
+To make fair comparisons, I tested different `max_tokens` values for both OpenAI APIs and Native APIs, leading to a discovery about parameter compliance differences: both SGlang and vLLM‘s `openai` APIs respect `max_tokens` parameter. SGLang's native api **completely ignores max_tokens parameter** while vLLM's native api generates **exactly** the `max_tokens` amount of tokens.
 
-**Consistent with original findings**: SGLang maintained its advantages in response time and request throughput when using native APIs (except for the initial warm-up phase).
+### Performance Analysis
 
-#### OpenAI-Compatible API Performance (10 concurrent, 100 requests)
+For completest test result, please refer to [here](./qwen3-final.md)
 
-| Metric                    | SGLang OpenAI | vLLM OpenAI    | Winner   |
-| ------------------------- | ------------- | -------------- | -------- |
-| **Average Response Time** | 4.51s         | **2.71s**      | **vLLM** |
-| **Standard Deviation**    | 0.04s         | **0.01s**      | **vLLM** |
-| **Actual Throughput**     | 2.21 req/s    | **3.66 req/s** | **vLLM** |
-| **Tokens Per Second**     | 455 tok/s     | **754 tok/s**  | **vLLM** |
-| **Test Duration**         | 45.33s        | **27.34s**     | **vLLM** |
+#### OpenAI API Performance (10 concurrent, 100 requests)
 
-**Complete performance reversal**: vLLM dominated across all metrics when using OpenAI-compatible APIs.
+**With Thinking Mode (max_tokens=3096)**
 
-For completest test result, please refer to [here](./qwen3.md)
+| Metric                    | vLLM              | SGLang          | Winner   |
+| ------------------------- | ----------------- | --------------- | -------- |
+| **Average Response Time** | **16.64-17.54s**  | 18.59-19.10s    | **vLLM** |
+| **Standard Deviation**    | **6.53-6.91s**    | 6.84-7.64s      | **vLLM** |
+| **Actual Throughput**     | **0.39 req/s**    | 0.36-0.38 req/s | **vLLM** |
+| **Tokens Per Second**     | **377-395 tok/s** | 337-369 tok/s   | **vLLM** |
 
-### Critical Discovery: API Interface Impact
+**Without Thinking Mode (max_tokens=3096)**
 
-Except for vllm is the winner this time,  another disconvery is that API interface choice can have more impact on performance than framework selection itself.
+| Metric                    | vLLM                | SGLang          | Winner   |
+| ------------------------- | ------------------- | --------------- | -------- |
+| **Average Response Time** | **6.0-7.0s**        | 7.8-8.9s        | **vLLM** |
+| **Standard Deviation**    | **4.4-4.7s**        | 5.6-6.2s        | **vLLM** |
+| **Actual Throughput**     | **0.66-0.70 req/s** | 0.57-0.59 req/s | **vLLM** |
 
-#### SGLang Performance Degradation with OpenAI API
-- **Native API**: 2.29s average response time
-- **OpenAI API**: 4.51s average response time  
-- **Performance loss**: 97% slower response times with OpenAI compatibility
+**Controlled Token Length (max_tokens=512, no thinking)**
 
-#### vLLM Consistent Performance Across APIs
-- **Native API**: 2.65s average response time
-- **OpenAI API**: 2.71s average response time
-- **Performance loss**: Only 2% slower with OpenAI compatibility
+| Metric                    | vLLM                | SGLang          | Winner   |
+| ------------------------- | ------------------- | --------------- | -------- |
+| **Average Response Time** | **4.1-4.7s**        | 4.6-5.2s        | **vLLM** |
+| **Actual Throughput**     | **1.71-1.75 req/s** | 1.56-1.64 req/s | **vLLM** |
+| **Tokens Per Second**     | **434-470 tok/s**   | 401-414 tok/s   | **vLLM** |
 
-### Model Architecture Impact on Framework Performance
+#### Native api
 
-#### Qwen3-4B vs Qwen2.5-7B: Key Differences
-1. **Hybrid thinking capabilities**: Qwen3 includes built-in reasoning modes
-3. **Smaller parameter count**: 4B vs 7B affecting GPU utilization patterns
-4. **Apache 2.0 licensing**: More permissive than previous versions
+**SGlang**: **Completely ignores max_tokens parameter**
 
-### Updated Framework Selection Guidelines
+- max_tokens=512 → generates ~128 tokens (actual: 101-128 range)
+- max_tokens=1024 → generates ~128 tokens (actual: 101-128 range)
+- max_tokens=3096 → generates ~128 tokens
+- **All responses show `completion_tokens: 128` and `finish_reason: {'type': 'length', 'length': 128}`**
 
-#### For Production Deployments (OpenAI API Required)
-**Recommendation: vLLM**
-- Excellent OpenAI API optimization
-- Consistent performance across interfaces
-- Better reasoning workload handling
-- Mature compatibility layer
+**vLLM API**: Respects max_tokens parameter precisely
 
-#### For Native API Deployments
-**Recommendation: Model-dependent testing required**
-- Qwen2.5-7B: SGLang advantages persist
-- Qwen3-4B: Mixed results, vLLM token generation superior
-- Test your specific model before deployment
+- max_tokens=512 → generates exactly 512 tokens
+- max_tokens=1024 → generates exactly 1024 tokens  
 
-### Lessons Learned: Benchmarking Methodology
+- **Response time scales predictably with token count**
 
-#### 1. Model Dependency is Critical
-Framework performance advantages **cannot be generalized** across model families. Performance characteristics can completely reverse between model generations.
-
-#### 2. API Interface Choice Matters More Than Framework
-The **API compatibility layer can introduce more overhead than framework optimizations provide**. Production considerations often outweigh raw performance.
-
-#### 3. Multiple Interface Testing is Essential
-Benchmarks using only native APIs **miss critical production performance characteristics**. Both interfaces must be tested for realistic deployment guidance.
-
-#### 4. Reasoning Capabilities Change the Game
-Models with built-in reasoning capabilities (like Qwen3's thinking mode) reveal different framework strengths that aren't apparent in traditional completion tasks.
-
-### Conclusion and Updated Recommendations
-
-The original conclusion that "SGLang is generally the more advantageous choice" requires significant revision:
-
-#### Revised Framework Selection Criteria
-
-1. **For Qwen 3, vLLM is recommended**
-2. **For OpenAI API compatibility (most production use cases)**: **vLLM is recommended**
-3. **For native API with traditional models**: **SGLang maintains some advantages**
-4. **For new model architectures**: **Always test both frameworks** - performance characteristics can be dramatically different
-
-#### Key Takeaway
-**Framework selection must be based on your specific combination of model architecture, API requirements, and workload characteristics**. The rapidly evolving LLM inference landscape requires continuous validation rather than relying on general benchmark conclusions.
-
-This testing reinforces the importance of comprehensive, real-world benchmarking methodology while highlighting that framework optimization is a moving target that requires ongoing evaluation as both models and frameworks evolve.
+So comparisons between them become **pointless**.
 
 ## Quick Recommendation 
 
-**For most use cases, choose vLLM.**  While SGLang shows advantages in specific scenarios (native API with certain models), vLLM provides: - Consistent performance across models and APIs - Better OpenAI compatibility (required for most production deployments)   - More mature ecosystem and broader adoption - Lower configuration complexity Unless you have very specific requirements and can thoroughly test both frameworks with your exact setup, vLLM is the safer, more reliable choice.
+**For most use cases, choose vLLM.**  vLLM provides better performance for Qwen3-4B in my test and consistent performance across models and APIs - Better OpenAI compatibility (required for most production deployments)   - More mature ecosystem and broader adoption - Lower configuration complexity 
+
+Unless you have very specific requirements and can thoroughly test both frameworks with your exact setup, vLLM is the safer, more reliable choice.
 
 ## Contributing
 
