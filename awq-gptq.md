@@ -1,4 +1,4 @@
-# Try to Quantize on GLM4 model
+# Try to Quantize GLM4 model
 
 Try  https://github.com/vllm-project/llm-compressor on https://huggingface.co/THUDM/GLM-4-9B-0414
 
