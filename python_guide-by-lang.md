@@ -541,13 +541,11 @@ dict([("a", 1)])    # {"a": 1}
 4. 1 < i < 13
 ```
 
-1 & 2 （**半开区间**）好处是 元素的个数可以用上下边界值相减 (`13-2` 或者 `12-1`)  半开区间的第二个好处是把这个区间拆分成相邻的两个区间，这个前一个区间的上边界值等于后一个区间的下边界值，不需要额外处理。但是在论述下边界(lower bound)  该用 `≤` 而上边界（higher bound）该用 `<` 我觉得有点啰嗦。
+1 & 2 （**半开区间**）好处是 元素的个数可以用上下边界值相减 (`13-2` 或者 `12-1`)  半开区间的第二个好处是把这个区间拆分成相邻的两个区间，前一个区间的上边界值等于后一个区间的下边界值，不需要额外处理。但是在论述下边界(lower bound)  该用 `≤` 而上边界（higher bound）该用 `<` 我觉得有点啰嗦。
 
-1 & 3 好处 从0 开始的区间不需要起始下标为负数（用从1 开始的区间不需要用0），Dijkstra的话是 2和4会 forces for a subsequence starting at the smallest natural number the lower bound as mentioned into the realm of the unnatural numbers. (很拗口)，所以这两条就能让我们选 `[a,b)` 这种半开区间形式，即下边界(lower bound)  该用 `≤` 
+1 & 3 (lower bound 用 `≤`  ) 好处 从0 开始的区间不需要起始下标为负数（用从1 开始的区间不需要用0），Dijkstra的话是 2和4会 forces for a subsequence starting at the smallest natural number the lower bound as mentioned into the realm of the unnatural numbers. (很拗口)，所以这两条就能让我们选 `[a,b)` 这种半开区间形式，即下边界(lower bound)  该用 `≤` 
 
-Dijkstra 进一步论述 1 & 4 好处是起始下标为0的**空区间**，上边界不需要是负数；也就是说上边界（higher bound）用`≤` 的2 & 3 情况，当表示起始下标为0的**空区间**的时候就需要用负数。 所以 上边界（higher bound）该用 `<` ， Dijkstra 基于以上三条理由选择第一种形式。
-
-注意："左闭右开区间"常见的 off-by-one errors ，比如取字符串的最后一个字母的下标是 [length-1]; 但这不是 0-indexed 的缺陷；而且以上4种表示方法都会引入各自的 off-by-one errors 
+Dijkstra 进一步论述 1 & 4 ( higher bound 用 `<` ) 好处是起始下标为0的 **空区间**，上边界不需要是负数；也就是说上边界（higher bound）用`≤` 的2 & 3 情况，当表示起始下标为0的**空区间**的时候就需要用负数。 所以 上边界（higher bound）该用 `<` ， Dijkstra 基于以上三条理由选择第一种形式。
 
 #### 0-based 
 
@@ -558,12 +556,13 @@ Dijkstra 进一步论述 1 & 4 好处是起始下标为0的**空区间**，上�
 1. 0-based **上边界值就是区间长度**: `[0, length)` 长度是 length. 
 2. 表示空区间 [0,0) 比 [1,1) 既然是空区间，为什么从1开始？
 3. 上面讨论半开区间好处之一是把这个区间拆分成相邻的两个区间，前一个区间长度是M：如果用 0-based, 可以直接处理为 `[0, M)` 和 `[M,N)` 但是如果1-based  需要额外处理  `[1, M+1)` 和 `[M+1,N)`   0-based **让区间运算方便**
+4. "左闭右开区间"常见的 off-by-one errors ，比如取字符串的最后一个字母的下标是 [length-1]; 但这不是 0-indexed 的缺陷；而且以上4种表示方法都会引入各自的 off-by-one errors 
 
 #### python 解决办法
 
 1. `for i in range(n)`  range(n) # 不需要关心是 0-9 还是 1-10
 2. 负索引 `s[-1]` 访问最后一个元素
-3. `arr[2:5]`   注意是 `[2,5`
+3. `arr[2:5]`   注意是 `[2,5)`
 4. 编程使用的不一致 inconsistency 是 off-by-one errors 发生的常见原因
 
 ```
@@ -749,6 +748,16 @@ text.title()            # "Hello World"（每个单词首字母大写）
 # 替换（不是原地修改，返回新字符串！）
 new_text = text.replace("Python", "Java")  # 原 text 不变
 ```
+正则函数库需要使用标准库 `re` . 引申一个话题，Bill Karwin 的quora 回答该用 ruby还是 python 开发web应用时候说过这个话，
+
+> To me, both Python and Ruby are basically like Perl, but with fixes for a bunch of the things that made Perl hard to use.
+>
+> The developers who drove Ruby popularity back in 2005 were always the kind of programmers who wanted to try new and shiny toys instead of proven and mature, so perhaps former Ruby users are trying out new languages.
+
+还有另外一个有趣回复
+
+> Python, perhaps simply through dumb luck (or not), was picked up by a lot of old Unix/C hackers in the late '90s and early aughts. It was also picked up by a lot of scientists. This lead to the creation of a lot of high-performance C libraries for Python for a very wide variety of tasks. Outside of maybe Java and C++, Python has more best-in-class libraries than almost any language out there, and the standard library is both deep and wide. Outside of libraries for web (and possibly devops), Ruby really can't compete in terms of library support.
+
 #### 长字符串的生成方式
 
 ```
@@ -1768,8 +1777,8 @@ if __name__ == '__main__':
 
 Java 中这些场景都需要类：
 - 工具函数（静态方法集合）
-- 单例模式
-- 命名空间
+- 单例模式 (singleton)
+- 命名空间 (namespace)
 
 **本质相同**：都是"不需要多个实例"
 
