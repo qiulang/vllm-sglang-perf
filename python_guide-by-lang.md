@@ -797,6 +797,8 @@ if __name__ == "__main__":
     print(result)
 ```
 
+使用上记住这个规则很容易，但要理解Python **脚本逻辑**和**模块逻辑**的区别可以参见29和30节
+
 ---
 
 ### 12. 列表推导式 vs filter/map
@@ -1263,12 +1265,24 @@ temp.celsius = 30
 c = temp.celsius
 ```
 
-**关键点**：
+**使用注意**：
+
+-  `@property` 装饰器只能标注 **getter** 方法.
+- Docstring 写在 **getter** 方法来描述这个属性 （Docstring 参见24节）
+- **setter** 必须是 `属性名称.setter`  (参见上面示例)
+- **deleter**  ``属性名称.deleter`，含义不是删除属性，而是清空、重置 ，关闭和释放资源，有实际使用场景才需要。
+
+**学习要点**：
+
+- 现在就把 `@property` 当作"Python提供的语法糖"来使用即可； 类似Java的getter/setter，但语法更优雅， 没有它自己也能实现。
+
 - 你现在只需要**会用** `@property`，不需要理解装饰器原理
+
 - 用 `@property` 把方法伪装成属性，提供更好的API
-- 类似Java的getter/setter，但语法更优雅
+
 - **装饰器的原理和自己创建装饰器在Advanced Level（第19节）讲解**
-- 现在就把 `@property` 当作"Python提供的语法糖"来使用即可
+
+  
 
 ---
 
@@ -1560,7 +1574,32 @@ def add(a, b):
 
 ---
 
-### 26. 魔法方法（dunder methods）
+### 26. 类型提示（Type Hints，Python 3.5+）
+
+从 Python 3.5+ 引入的类型注解功能，让你**可选地**标注变量、函数参数和返回值的类型。但要注意Python 是动态类型语言，Type Hints 不影响代码运行，只是提供额外的类型信息辅助工具帮助**解释代码意图**。
+
+Type Hints 对于理解别人的代码、大项目协作有帮助，但是在一次性脚本 / 快速原型，类型明显的简单函数 不需要。这是一个锦上添花的功能。
+
+```python
+from typing import List, Dict, Optional
+
+def process_names(names: List[str], max_length: int = 10) -> Dict[str, int]:
+    return {name: len(name) for name in names if len(name) <= max_length}
+
+def find_user(user_id: int) -> Optional[str]:
+    # Optional[str] 表示可能返回str或None
+    if user_id == 1:
+        return "Lang"
+    return None
+
+# 类型提示不强制执行，但IDE和mypy等工具会检查
+```
+
+---
+
+### 27. 魔法方法（dunder methods）
+
+**dunder** methods 是 "**double underscore** methods" 的缩写，实现这些特殊的方法能让我们自己写的类也能被 Python 的**系统方法**和**操作符**调用：
 
 ```python
 class Vector:
@@ -1581,31 +1620,29 @@ v1 = Vector(1, 2)
 v2 = Vector(3, 4)
 v3 = v1 + v2  # 调用 __add__
 print(v3)     # 调用 __str__: "Vector(4, 6)"
+print(len(v3)) # 调用 __len__ 
 ```
 
----
+dunder 的方法很多，需要时候查手册，常用到有这些：
 
-### 27. 类型提示（Type Hints，Python 3.5+）
-
-```python
-from typing import List, Dict, Optional
-
-def process_names(names: List[str], max_length: int = 10) -> Dict[str, int]:
-    return {name: len(name) for name in names if len(name) <= max_length}
-
-def find_user(user_id: int) -> Optional[str]:
-    # Optional[str] 表示可能返回str或None
-    if user_id == 1:
-        return "Lang"
-    return None
-
-# 类型提示不强制执行，但IDE和mypy等工具会检查
+```
+__init__(self, ...)
+__str__(self)
+__repr__(self)
+__eq__(self, other)
+__add__(self, other)
+__len__(self)
+__getitem__(self, key)
 ```
 
 
 ---
 
 ### 28. `dataclass`装饰器（Python 3.7+）
+
+Python的数据类随着Python版本的演化不断更新变化，从普通类到 `typing.NamedTuple`再到 `@dataclass`；`@dataclass` 从3.7开始的每个小版本也都有新功能添加。再到第三方库 **Pydantic**提供数据验证和序列化框架来实现 dataclass
+
+这也是一个锦上添花的功能，简单脚本、少量数据用 tuple 和 dict 就足够；数据结构完全动态，字段不固定使用时候tuple 和 dict ; 切实有实际需要再考虑 dataclass ，不然就会陷入过早优化，过度优化的陷阱。
 
 ```python
 from dataclasses import dataclass
@@ -1933,11 +1970,19 @@ Custom time: 2024-01-01T12:00
 
 ---
 
-### 30. EAFP vs LBYL
+### 30. 关于 python 项目文件结构的调整
 
-EAFP = Easier to Ask for Forgiveness than Permission
+一开始做原型开发时候，经常只是把一堆文件都放在同一级目录下，随着项目扩大，需要更好的文件目录组织方式。把文件做整理可以一步到位，也可以分阶段进行，减少初期学习和投入成本。这个话题需要一个专题讲解，所以单独列写在一份文件里
 
-LBYL = Look Before You Leap 
+参见 [python 项目文件结构的调整](./python_project_structure_guide.md)
+
+---
+
+### 31. EAFP vs LBYL 两种风格
+
+EAFP = Easier to Ask for Forgiveness than Permission，先做再说，出错就处理
+
+LBYL = Look Before You Leap ，检查各种条件满足后再处理
 
 这两种编程风格 python 更倾向与 EAFP
 
@@ -2026,12 +2071,6 @@ def process_data(data):
         logging.exception("Unexpected error")
         raise
 ```
-
-### 31. 关于 python 项目文件结构的调整
-
-一开始做原型开发时候，经常只是把一堆文件都放在同一级目录下，随着项目扩大，需要更好的文件目录组织方式。把文件做整理可以一步到位，也可以分阶段进行，减少初期学习和投入成本。这个话题需要一个专题讲解，所以单独列写在一份文件里
-
-参见 [python 项目文件结构的调整](./python_project_structure_guide.md)
 
 
 ## 专题：*args和**kwargs详解

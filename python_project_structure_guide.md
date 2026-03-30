@@ -294,6 +294,9 @@ python -m json.tool data.json
 python -m venv .venv
 ```
 
+注意方案B (使用相对引用 )的隐性代价——**任何文件都不能再直接当脚本跑了**  `src/` 和 `tests/` 下的文件都不能再直接用路径方式跑，必须都要用 `-m` 方式。不然会报错 `ImportError: attempted relative import with no known parent package`
+
+
 
 ## 迁移方案需要新增的文件
 
