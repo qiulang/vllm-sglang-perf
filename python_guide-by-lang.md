@@ -1270,7 +1270,7 @@ c = temp.celsius
 -  `@property` 装饰器只能标注 **getter** 方法.
 - Docstring 写在 **getter** 方法来描述这个属性 （Docstring 参见24节）
 - **setter** 必须是 `属性名称.setter`  (参见上面示例)
-- **deleter**  ``属性名称.deleter`，含义不是删除属性，而是清空、重置 ，关闭和释放资源，有实际使用场景才需要。
+- **deleter**  `属性名称.deleter`，含义不是删除属性，而是清空、重置 ，关闭和释放资源，有实际使用场景才需要。
 
 **学习要点**：
 
@@ -1595,6 +1595,9 @@ def find_user(user_id: int) -> Optional[str]:
 # 类型提示不强制执行，但IDE和mypy等工具会检查
 ```
 
+Type Hints 唯一必须使用的场景是使用 `@dataclass` , 参见 #28 节
+
+
 ---
 
 ### 27. 魔法方法（dunder methods）
@@ -1635,6 +1638,8 @@ __len__(self)
 __getitem__(self, key)
 ```
 
+`dataclass`装饰器会自动创建  `__init__` /  `__str__` / `__repr__` 这三个 dunder 方法
+
 
 ---
 
@@ -1643,6 +1648,8 @@ __getitem__(self, key)
 Python的数据类随着Python版本的演化不断更新变化，从普通类到 `typing.NamedTuple`再到 `@dataclass`；`@dataclass` 从3.7开始的每个小版本也都有新功能添加。再到第三方库 **Pydantic**提供数据验证和序列化框架来实现 dataclass
 
 这也是一个锦上添花的功能，简单脚本、少量数据用 tuple 和 dict 就足够；数据结构完全动态，字段不固定使用时候tuple 和 dict ; 切实有实际需要再考虑 dataclass ，不然就会陷入过早优化，过度优化的陷阱。
+
+但是当切实体会到 tuple 和 dict  存储数据的问题，就可以考虑使用dataclaass， 一个简单的例子：
 
 ```python
 from dataclasses import dataclass
@@ -1661,7 +1668,119 @@ user = User("Lang", 25)
 print(user)  # User(name='Lang', age=25, city='Beijing')
 ```
 
----
+使用 `@dataclass` 必须使用 Type Hints 对 属性标注，因为只有被标注的属性才是对象属性，才会被 `@dataclass` 自动生成的`__init__` 处理，创建出对象属性 ；没有标注的属性会被当成class 属性 （有标注又不想被处理成class属性就要使用 `: ClassVar[类型]`）。
+
+确实想让某个属性成为类属性，建议使用 ClassVar， 而不是不标注，因为不标注意图不明确，可能会让人误以为是漏了标注。
+
+使用 `@dataclass`  到第二个要点是 如果对象是 collection，又希望提供缺省值怎么处理：
+
+```
+@dataclass
+class Foo:
+    name: str          # 必填， 必填参数必须排在选填参数前面
+    items: list        # 必填
+    # 类属性的两种写法
+    count: ClassVar[int] = 0   # 方法1：ClassVar 明确标注
+    debug = False              # 方法2：不标注
+    count: int = 0     # 选填，有默认值， 
+
+# 创建时必须传
+a = Foo(name="test", items=[1, 2, 3])
+b = Foo("test", [1, 2, 3])  # 位置参数也可以
+
+# 不传会报错
+c = Foo()  # TypeError: missing 2 required arguments
+```
+
+如果希望对 `items: list` 提供缺省值 ，在 **Python 3.11+** 这样写会报错 `mutable default is not allowed`
+
+```
+@dataclass
+class Foo:
+    name: str          # 必填， 必填参数必须排在选填参数前面
+    items: list = []   # 本意提供缺省参数，但是 ❌ 会报错！
+    
+ValueError: mutable default is not allowed: use default_factory    
+```
+
+这涉及 python 一个经典错误 **Mutable Default Arguments**
+
+```
+def append_to(element, to=[]):
+    to.append(element)
+    return to
+
+my_list = append_to(12)
+print(my_list)
+
+my_other_list = append_to(42)
+print(my_other_list)
+
+# 输出
+
+[12]
+[12, 42]
+```
+
+Python’s default arguments are evaluated *once* when the function is defined, not each time the function is called, 常见的改法是这样：
+
+```
+def append_to(element, to=None):
+    if to is None:
+        to = []
+    to.append(element)
+    return to
+```
+
+这是 python 的历史遗留问题，所以在 @dataclass 里 强制要求对 **Mutable Default Arguments** 需要用 `field(default_factory=xxx)` 的写法 （注意，不提供缺省值就不需要它）
+
+```
+from dataclasses import dataclass, field
+
+@dataclass
+class Config:
+    name: str = "default"               # ✅ 不可变对象，直接赋值没问题
+    tags: list = field(default_factory=list)      # ✅ 可变对象，用 factory
+    meta: dict = field(default_factory=dict)      # ✅ 同理
+    scores: list = field(default_factory=lambda: [0, 0, 0])  # ✅ 带初始值
+
+a = Config()
+b = Config()
+a.tags.append("hello")
+print(b.tags)   # []  ← 互不影响
+```
+
+了解了 `field(default_factory=xxx)`  在进一步了解 `field(default=value)`
+
+`field(default=value)` 就是用 `field` 来显式写一个普通默认值，效果等同于直接 `= value`：
+
+```python
+@dataclass
+class Foo:
+    name: str = "hello"              # 简写
+    name: str = field(default="hello")  # 等价的完整写法
+```
+
+既然效果一样，为什么要用 `field(default=...)`？因为 `field` 还有其他参数，当你需要同时控制多个行为时才需要它：
+
+```python
+@dataclass
+class Foo:
+    name: str = field(default="hello", repr=False)   # 不出现在 __repr__ 里
+    age:  int = field(default=0,       compare=False) # 不参与比较
+    memo: str = field(default="",      init=False)    # 不放进 __init__，只内部用
+```
+
+单独用 `field(default="hello")` 没有意义，直接 `= "hello"` 就够了。它存在的价值是**和其他参数配合使用**。
+
+所以两个 field 参数的定位很清晰：
+
+| 参数               | 用于                              |
+| ------------------ | --------------------------------- |
+| `default=`         | 不可变的默认值（str, int, bool…） |
+| `default_factory=` | 可变对象的默认值（list, dict…）   |
+
+两者不能同时使用，二选一。
 
 ### 29. Module vs Class
 
