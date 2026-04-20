@@ -706,6 +706,11 @@ if value == None:
     pass
 ```
 
+#### 5. any vs all
+
+参见 23. python 的真值
+
+
 ---
 
 ### 10. 字符串不可变（immutable）
@@ -830,7 +835,7 @@ sys.getsizeof(42)   # 28 字节，C 里 int 只有 4 字节
 #### list 连续的是指针，不是数据
 
 ```python
-lst = [10, 20, 30, 40]
+lst = [10, 20, 30, 40] 
 
 # C 开发人员以为：
 # ┌────┬────┬────┬────┐
@@ -843,6 +848,8 @@ lst = [10, 20, 30, 40]
 # └──┬───┴──┬───┴──┬───┴──┬───┘
 #    ▼      ▼      ▼      ▼
 #   [10]   [20]   [30]   [40]    ← 对象散落在 heap 各处
+#
+# 另外注意 list的长度可变
 
 # 证据：放什么类型，每个槽大小都一样
 import sys
@@ -1545,6 +1552,62 @@ Boolean(0)         // false - 数字0
 Boolean(NaN)       // false - 非数字
 Boolean("")        // false - 空字符串
 Boolean(0n)        // false - BigInt 0
+```
+
+#### `any(iterable)` vs `all(iterable)`
+
+1.  `any(iterable)` 如果可迭代对象中至少有一个元素为真（True），则返回 True；否则返回 False。
+
+```
+any([False, 0, "", None])        # False
+any([False, 42, "", None])        # True (42 为真)
+any([])                           # False
+```
+
+2.  `all(iterable)` 如果可迭代对象中所有元素都为真（True），则返回 True；否则返回 False。
+
+```
+all([True, 1, "hello"])           # True
+all([True, 0, "hello"])           # False (0 为假)
+all([])                           # True
+```
+
+注意： `all[]`  "是否所有元素都是 True？" → 找不到任何反例 → True 这事容易犯错的地方
+
+可以这样来理解，有两种方式来实现 any and all 
+
+1. 遍历实现
+
+```
+# Source - https://stackoverflow.com/a/3275125
+# Posted by John La Rooy, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-04-20, License - CC BY-SA 2.5
+
+def all(seq):
+    for item in seq:
+        if not item:
+            return False
+    return True
+
+def any(seq):
+    for item in seq:
+        if item:
+            return True
+    return False
+```
+
+2. 递归实现
+
+```
+# Source - https://stackoverflow.com/a/3275099
+# Posted by kennytm, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-04-20, License - CC BY-SA 2.5
+
+any([x,y,z,...]) == (x or any([y,z,...]))
+x == any([x]) == (x or any([]))
+
+all([x,y,z,...]) == (x and all([y,z,...]))
+x == all([x]) == (x and all([]))
 ```
 
 -------
