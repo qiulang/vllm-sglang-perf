@@ -19,6 +19,10 @@
 - [Contributing](#contributing)
 - [License](#license)
 
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-orange.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.30-green.svg)]()
+
 ## Introduction
 
 [SGLang](https://github.com/sgl-project/sglang) and [vLLM](https://github.com/vllm-project/vllm) are both high-performance inference frameworks for large language models, with SGLang taking a compilation-based approach while vLLM focuses on optimized attention and memory management.

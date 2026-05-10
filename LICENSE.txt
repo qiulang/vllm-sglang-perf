@@ -1,0 +1,22 @@
+BSD 3-Clause License
+
+**Copyright (c) 2026, Lang Qiu (邱朗)**
+**All rights reserved.**
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+(本软件源代码及二进制形式的再分发与使用，无论是否修改，均需遵守以下三项条款：)
+
+1. **Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.**
+(条款一：源代码再分发必须保留上述版权声明、本条款列表及文末免责声明。)
+2. **Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.**
+(条款二：二进制形式再分发必须在随附文档或材料中重现上述版权声明、本条款列表及文末免责声明。)
+3. **Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.**
+(条款三：未经书面许可，不得使用版权持有人或贡献者的姓名来为衍生产品背书或促销。)
+
+---
+
+**DISCLAIMER (免责声明)**
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES.
+
+(本软件按“现状”提供。在任何情况下，版权持有人均不对因使用本软件而产生的任何直接或间接损害承担责任。)
