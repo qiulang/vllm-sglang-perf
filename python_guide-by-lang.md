@@ -205,7 +205,7 @@ CMD ["python", "main.py"]
 
 uv 是目前最新，最流行的python 包安装和虚拟环境管理工具。2026可以跳过上面其他工具，直接了解、使用uv .这里我们只简单的对比 conda 和 uv：
 
-**conda**: Centralized, named environments
+**conda**: **Centralized**, named environments
 
 - One environment (e.g., `myenv`) shared across multiple projects
 - Located in `~/miniconda3/envs/`
@@ -215,9 +215,10 @@ uv 是目前最新，最流行的python 包安装和虚拟环境管理工具。2
 conda create -n myenv python=3.10
 conda activate myenv
 conda install packages
+conda env list # uv 没有这样对应的命令
 ```
 
-**uv**: Decentralized, per-project environments
+**uv**: Decentralized, **per-project environments**
 
 - Each project has its own `.venv/` directory
 
@@ -552,7 +553,7 @@ dict([("a", 1)])    # {"a": 1}
 
 这个知识点是我的个人喜好。 C/Java/js/python都是 zero-indexing. 
 
-#### 半开区间表示序列更好
+#### 半开区间表示序列”更好”
 
 最经典的解释还是 https://www.cs.utexas.edu/~EWD/transcriptions/EWD08xx/EWD831.html Dijkstra 1982年的短文。
 
@@ -584,7 +585,7 @@ Dijkstra 进一步论述 1 & 4 ( higher bound 用 `<` ) 好处是起始下标为
 3. 上面讨论半开区间好处之一是把这个区间拆分成相邻的两个区间，前一个区间长度是M：如果用 0-based, 可以直接处理为 `[0, M)` 和 `[M,N)` 但是如果1-based  需要额外处理  `[1, M+1)` 和 `[M+1,N)`   0-based **让区间运算方便**
 4. "左闭右开区间"常见的 off-by-one errors ，比如取字符串的最后一个字母的下标是 [length-1]; 但这不是 0-indexed 的缺陷；而且以上4种表示方法都会引入各自的 off-by-one errors 
 
-#### python 解决办法
+#### 0-based python 提供“便利”方法
 
 1. `for i in range(n)`  range(n) # 不需要关心是 0-9 还是 1-10
 2. 负索引 `s[-1]` 访问最后一个元素
@@ -602,6 +603,49 @@ text[0:3]      # "Hel" - exclusive upper bound
 SELECT * FROM orders 
 WHERE day BETWEEN 1 AND 5;  -- Inclusive both ends!
 ```
+#### 0-based 是 trade-off，不是唯一真理
+
+0-based 在数组寻址上有数学合理性，但并不是在所有场景下都"更好"。
+日期和时间就是一个典型的矛盾案例：month/day 是 1-based，hour 是 0-based，这符合我们实际使用习惯，但是注意 weekday ，提供了两个版本：
+
+```python
+from datetime import datetime
+
+dt = datetime(2026, 5, 15)
+print(dt.month)        # 5   → 1-based，五月就是 5，自然
+print(dt.day)          # 15  → 1-based，15号就是 15，自然
+print(dt.hour)         # 0-based（0~23）
+print(dt.weekday())    # 4   → 0-based，0=周一，4=周五
+print(dt.isoweekday()) # 5   → 1-based，1=周一，5=周五
+```
+
+**为什么会有两个 weekday？**
+
+`weekday()` 是早期设计，0-based 方便直接做列表索引：
+
+```python
+DAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+print(DAYS[dt.weekday()])   # 直接用，不需要 -1
+```
+
+`isoweekday()` 是后来为了遵守 ISO 8601 标准补充的，1=周一，7=周日，
+符合人类直觉。两个方法就这样共存至今。
+
+**实际使用建议：**
+
+```python
+# 判断工作日/周末 → isoweekday()，更直觉
+if dt.isoweekday() >= 6:
+    print("周末")
+
+# 做列表索引映射 → weekday()
+print(DAYS[dt.weekday()])
+
+# 格式化输出 → strftime，两个都不用
+print(dt.strftime("%A"))   # "Friday"
+```
+
+注：JavaScript 的 `Date` 则是更著名的反例：month 是 0-based，day 是 1-based，同一个对象里基准不同，导致了无数 off-by-one bug。这个问题折磨了 JS 开发者将近 30 年，直到 Temporal API（ES2026，2026年3月正式进入 Stage 4）才彻底解决，统一为 1-based。
 
 ---
 
@@ -779,16 +823,6 @@ text.title()            # "Hello World"（每个单词首字母大写）
 # 替换（不是原地修改，返回新字符串！）
 new_text = text.replace("Python", "Java")  # 原 text 不变
 ```
-正则函数库需要使用标准库 `re` . 引申一个话题，Bill Karwin 的quora 回答该用 ruby还是 python 开发web应用时候说过这个话，
-
-> To me, both Python and Ruby are basically like Perl, but with fixes for a bunch of the things that made Perl hard to use.
->
-> The developers who drove Ruby popularity back in 2005 were always the kind of programmers who wanted to try new and shiny toys instead of proven and mature, so perhaps former Ruby users are trying out new languages.
-
-还有另外一个有趣回复
-
-> Python, perhaps simply through dumb luck (or not), was picked up by a lot of old Unix/C hackers in the late '90s and early aughts. It was also picked up by a lot of scientists. This lead to the creation of a lot of high-performance C libraries for Python for a very wide variety of tasks. Outside of maybe Java and C++, Python has more best-in-class libraries than almost any language out there, and the standard library is both deep and wide. Outside of libraries for web (and possibly devops), Ruby really can't compete in terms of library support.
-
 #### 长字符串的生成方式
 
 ```
@@ -802,6 +836,21 @@ new_text = text.replace("Python", "Java")  # 原 text 不变
     "FROM bar",
     "WHERE baz",
   ))
+```
+
+#### 正则分组是 1-based，group(0) 是特殊值
+
+正则是字符串处理最常用的工具，需要使用标准库`re`，但 `re` 模块的分组编号使用时候要注意——捕获组从 1 开始，group(0) 是整个匹配：
+
+```python
+import re
+
+m = re.match(r'(\d{4})-(\d{2})-(\d{2})', '2026-05-15')
+
+print(m.group(0))   # '2026-05-15'，整个匹配，0 是特殊值
+print(m.group(1))   # '2026'，第一个捕获组，1-based
+print(m.group(2))   # '05'
+print(m.group(3))   # '15'
 ```
 
 ### X. 没有内置 Array —— 理解 list 和 str 的内存本质
@@ -923,6 +972,15 @@ arr = np.array([10, 20, 30, 40], dtype=np.int32)
 | 元素类型   | 固定                 | 固定（字符）   | 任意混合                    | 固定           |
 | Cache 友好 | ✅                    | ✅              | ⚠️                           | ✅              |
 
+**引申一个话题**，Bill Karwin 的quora 回答该用 ruby还是 python 开发web应用时候说过这个话，
+
+> To me, both Python and Ruby are basically like Perl, but with fixes for a bunch of the things that made Perl hard to use.
+>
+> The developers who drove Ruby popularity back in 2005 were always the kind of programmers who wanted to try new and shiny toys instead of proven and mature, so perhaps former Ruby users are trying out new languages.
+
+还有另外一个有趣回复
+
+> Python, perhaps simply through dumb luck (or not), was picked up by a lot of old Unix/C hackers in the late '90s and early aughts. It was also picked up by a lot of scientists. This lead to the creation of a lot of high-performance C libraries for Python for a very wide variety of tasks. Outside of maybe Java and C++, Python has more best-in-class libraries than almost any language out there, and the standard library is both deep and wide. Outside of libraries for web (and possibly devops), Ruby really can't compete in terms of library support.
 
 ---
 
