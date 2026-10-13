@@ -21,7 +21,7 @@ from rich.progress import Progress, TaskID
 
 # Default values
 DEFAULT_URL = "http://localhost:8000/v1/completions"
-DEFAULT_MODEL = "/home/vllm/llm/Qwen7B-awq"
+DEFAULT_MODEL = "qwen3-14b"
 DEFAULT_CONCURRENT = 30
 DEFAULT_TOTAL = 300
 DEFAULT_TIMEOUT = 120  # 2 minutes timeout
@@ -38,7 +38,17 @@ PROMPT_LIST = [
     "What are some best practices for securing a web application?",
     "Describe how virtualization works in cloud computing.",
     "What is the difference between supervised and unsupervised machine learning?",
-    "Explain how public key cryptography works in simple terms."
+    "Explain how public key cryptography works in simple terms.",
+    "What are the advantages and disadvantages of microservices architecture?",
+    "How does HTTP caching improve web performance?",
+    "Explain the concept of eventual consistency in distributed systems.",
+    "What is the difference between authentication and authorization?",
+    "Describe how DNS resolution works step by step.",
+    "What are the main principles of REST API design?",
+    "Explain how load balancing works in web applications.",
+    "What is the purpose of a CDN and how does it work?",
+    "Describe the difference between horizontal and vertical scaling.",
+    "How do containers differ from virtual machines?"
 ]
 
 console = Console()

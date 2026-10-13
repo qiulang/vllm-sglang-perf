@@ -1,5 +1,7 @@
 # SGLang vs vLLM Performance Comparison: An Initial Assessment
 
+> **Latest test (2026-10-13):** the results below are from tests run in April–May 2025 on NVIDIA A10. For the updated test with newer vLLM and SGLang versions on NVIDIA L20, see [2026-update.md](2026-update.md).
+
 ## Table of Contents
 - [Introduction](#introduction)
 - [Test Setup](#test-setup)

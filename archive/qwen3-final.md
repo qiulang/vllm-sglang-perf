@@ -389,6 +389,137 @@ Test completed in 57.02 seconds
 └────────────────────────────┴──────────────────────────────┘
 ```
 
+**compare with qwen2.5-7B**
+
+```
+Test completed in 66.57 seconds
+        LLM Stress Test Results - 2025-05-27 17:49:16        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ API Base                   │ http://localhost:8000/v1     │
+│ Model                      │ /home/vllm/llm/Qwen/Qwen2-7B │
+│ Max Tokens                 │ 512                          │
+│ Temperature                │ 0.7                          │
+│ Concurrent Requests        │ 10                           │
+│ Total Requests             │ 100                          │
+│ Successful Requests        │ 100 (100.0%)                 │
+│ Failed Requests            │ 0 (0.0%)                     │
+│ Total Test Duration        │ 66.56 seconds                │
+│ Min Response Time          │ 1.08 seconds                 │
+│ Max Response Time          │ 6.86 seconds                 │
+│ Average Response Time      │ 4.70 seconds                 │
+│ Median Response Time       │ 4.75 seconds                 │
+│ P90 Response Time          │ 6.74 seconds                 │
+│ P95 Response Time          │ 6.86 seconds                 │
+│ P99 Response Time          │ 6.86 seconds                 │
+│ Std Dev Response Time      │ 1.90 seconds                 │
+│ Theoretical Max Throughput │ 14.57 requests/second        │
+│ Actual Throughput          │ 1.50 requests/second         │
+│ Total Generated Tokens     │ 27291                        │
+│ Tokens Per Second          │ 409.99                       │
+│ Avg Tokens Per Request     │ 272.91                       │
+│ Peak Requests In Flight    │ 10                           │
+└────────────────────────────┴──────────────────────────────┘
+
+Test completed in 65.58 seconds
+        LLM Stress Test Results - 2025-05-27 17:47:11        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ API Base                   │ http://localhost:8000/v1     │
+│ Model                      │ /home/vllm/llm/Qwen/Qwen2-7B │
+│ Max Tokens                 │ 512                          │
+│ Temperature                │ 0.7                          │
+│ Concurrent Requests        │ 10                           │
+│ Total Requests             │ 100                          │
+│ Successful Requests        │ 100 (100.0%)                 │
+│ Failed Requests            │ 0 (0.0%)                     │
+│ Total Test Duration        │ 65.58 seconds                │
+│ Min Response Time          │ 0.96 seconds                 │
+│ Max Response Time          │ 6.78 seconds                 │
+│ Average Response Time      │ 4.71 seconds                 │
+│ Median Response Time       │ 5.06 seconds                 │
+│ P90 Response Time          │ 6.63 seconds                 │
+│ P95 Response Time          │ 6.76 seconds                 │
+│ P99 Response Time          │ 6.78 seconds                 │
+│ Std Dev Response Time      │ 1.79 seconds                 │
+│ Theoretical Max Throughput │ 14.75 requests/second        │
+│ Actual Throughput          │ 1.52 requests/second         │
+│ Total Generated Tokens     │ 27542                        │
+│ Tokens Per Second          │ 419.95                       │
+│ Avg Tokens Per Request     │ 275.42                       │
+│ Peak Requests In Flight    │ 10                           │
+└────────────────────────────┴──────────────────────────────┘
+
+
+```
+
+**compare with qwen3-8B**
+
+````
+Test completed in 74.02 seconds
+        LLM Stress Test Results - 2025-05-27 17:58:01        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ API Base                   │ http://localhost:8000/v1     │
+│ Model                      │ /home/vllm/llm/Qwen/Qwen3-8B │
+│ Max Tokens                 │ 512                          │
+│ Temperature                │ 0.7                          │
+│ Concurrent Requests        │ 10                           │
+│ Total Requests             │ 100                          │
+│ Successful Requests        │ 100 (100.0%)                 │
+│ Failed Requests            │ 0 (0.0%)                     │
+│ Total Test Duration        │ 74.02 seconds                │
+│ Min Response Time          │ 1.02 seconds                 │
+│ Max Response Time          │ 7.60 seconds                 │
+│ Average Response Time      │ 5.30 seconds                 │
+│ Median Response Time       │ 6.92 seconds                 │
+│ P90 Response Time          │ 7.53 seconds                 │
+│ P95 Response Time          │ 7.59 seconds                 │
+│ P99 Response Time          │ 7.60 seconds                 │
+│ Std Dev Response Time      │ 2.45 seconds                 │
+│ Theoretical Max Throughput │ 13.16 requests/second        │
+│ Actual Throughput          │ 1.35 requests/second         │
+│ Total Generated Tokens     │ 24606                        │
+│ Tokens Per Second          │ 332.42                       │
+│ Avg Tokens Per Request     │ 246.06                       │
+│ Peak Requests In Flight    │ 10                           │
+└────────────────────────────┴──────────────────────────────┘
+
+Test completed in 74.74 seconds
+        LLM Stress Test Results - 2025-05-27 18:01:01        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                     ┃ Value                        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ API Base                   │ http://localhost:8000/v1     │
+│ Model                      │ /home/vllm/llm/Qwen/Qwen3-8B │
+│ Max Tokens                 │ 512                          │
+│ Temperature                │ 0.7                          │
+│ Concurrent Requests        │ 10                           │
+│ Total Requests             │ 100                          │
+│ Successful Requests        │ 100 (100.0%)                 │
+│ Failed Requests            │ 0 (0.0%)                     │
+│ Total Test Duration        │ 74.73 seconds                │
+│ Min Response Time          │ 0.80 seconds                 │
+│ Max Response Time          │ 7.61 seconds                 │
+│ Average Response Time      │ 5.80 seconds                 │
+│ Median Response Time       │ 7.29 seconds                 │
+│ P90 Response Time          │ 7.54 seconds                 │
+│ P95 Response Time          │ 7.60 seconds                 │
+│ P99 Response Time          │ 7.61 seconds                 │
+│ Std Dev Response Time      │ 2.19 seconds                 │
+│ Theoretical Max Throughput │ 13.14 requests/second        │
+│ Actual Throughput          │ 1.34 requests/second         │
+│ Total Generated Tokens     │ 27398                        │
+│ Tokens Per Second          │ 366.60                       │
+│ Avg Tokens Per Request     │ 273.98                       │
+│ Peak Requests In Flight    │ 10                           │
+└────────────────────────────┴──────────────────────────────┘
+
+````
+
 
 
 

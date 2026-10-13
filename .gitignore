@@ -1,0 +1,3 @@
+*.sh
+# OS
+.DS_Store

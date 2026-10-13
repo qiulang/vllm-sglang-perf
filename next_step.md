@@ -127,3 +127,9 @@ For GPUs that can't meet targets alone:
 - Verify model loading before extended testing
 - Use identical test scripts and procedures
 - Run multiple validation tests before concluding
+
+
+
+## 2026.2.26 update
+
+https://github.com/vllm-project/vllm/discussions/17221
